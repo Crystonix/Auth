@@ -1,0 +1,94 @@
+services:
+  postgres-app:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_APP_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_APP_DB}
+    ports:
+      - "${POSTGRES_APP_PORT}:5432"
+    volumes:
+      - pgdata-app:/var/lib/postgresql/data
+
+  postgres-keycloak:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_KC_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_KC_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_KC_DB}
+    ports:
+      - "${POSTGRES_KC_PORT}:5432"
+    volumes:
+      - pgdata-keycloak:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.0
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/${POSTGRES_KC_DB}
+      KC_DB_USERNAME: ${POSTGRES_KC_USER}
+      KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD}
+      KC_HOSTNAME: localhost
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    ports:
+      - "${KEYCLOAK_PORT}:8080"
+    depends_on:
+      - postgres-keycloak
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+
+  commission-service:
+    build:
+      context: ../
+      dockerfile: services/commission-service/Dockerfile
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_APP_USER}:${POSTGRES_APP_PASSWORD}@postgres-app:5432/${POSTGRES_APP_DB}
+    depends_on:
+      - postgres-app
+    ports:
+      - "${COMMISSION_SERVICE_PORT}:4000"
+
+  auth-service:
+    build:
+      context: ../
+      dockerfile: services/auth-service/Dockerfile
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_APP_USER}:${POSTGRES_APP_PASSWORD}@postgres-app:5432/${POSTGRES_APP_DB}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+    depends_on:
+      - postgres-app
+      - keycloak
+    ports:
+      - "${AUTH_SERVICE_PORT}:4000"
+
+  payment-service:
+    build:
+      context: ../
+      dockerfile: services/payment-service/Dockerfile
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_APP_USER}:${POSTGRES_APP_PASSWORD}@postgres-app:5432/${POSTGRES_APP_DB}
+    depends_on:
+      - postgres-app
+    ports:
+      - "${PAYMENT_SERVICE_PORT}:4000"
+
+  web:
+    build:
+      context: ../
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      - commission-service
+      - auth-service
+      - payment-service
+    ports:
+      - "${WEB_PORT}:5173"
+
+volumes:
+  pgdata-app:
+  pgdata-keycloak:
+  keycloak-data:

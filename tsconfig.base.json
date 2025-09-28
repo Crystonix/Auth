@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@db/*": ["packages/db/src/*"],
+      "@types/*": ["packages/types/src/*"],
+      "@utils/*": ["packages/utils/src/*"]
+    }
+  }
+}
