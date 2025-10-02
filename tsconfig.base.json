@@ -8,9 +8,9 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@db/*": ["packages/db/src/*"],
-      "@types/*": ["packages/types/src/*"],
-      "@utils/*": ["packages/utils/src/*"]
+      "@db/*": ["packages/db/*"],
+      "@types/*": ["packages/types/*"],
+      "@utils/*": ["packages/utils/*"]
     }
   }
 }

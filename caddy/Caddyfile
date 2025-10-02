@@ -1,0 +1,59 @@
+{
+    debug
+}
+
+# -------------------------------
+# Development: localhost, no TLS
+# -------------------------------
+:80 {
+    # API proxy
+    handle_path /api/commission/* {
+        reverse_proxy commission-service:4000
+    }
+    handle_path /api/auth/* {
+        reverse_proxy auth-service:4000
+    }
+    handle_path /api/payment/* {
+        reverse_proxy payment-service:4000
+    }
+
+    # Serve frontend if build exists
+    handle_path /* {
+        root * /srv/frontend
+        encode zstd gzip
+        try_files {path} /index.html
+        file_server
+    }
+}
+
+# -------------------------------
+# Production: yourdomain.com, TLS enabled
+# -------------------------------
+yourdomain.com {
+    tls you@example.com  # Replace with real email
+
+    # API proxy
+    handle_path /api/commission/* {
+        reverse_proxy commission-service:4000
+    }
+    handle_path /api/auth/* {
+        reverse_proxy auth-service:4000
+    }
+    handle_path /api/payment/* {
+        reverse_proxy payment-service:4000
+    }
+
+    # Serve frontend if build exists
+    handle_path /* {
+        root * /srv/frontend
+        encode zstd gzip
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Redirect HTTP -> HTTPS
+    @http {
+        protocol http
+    }
+    redir @http https://{host}{uri} permanent
+}

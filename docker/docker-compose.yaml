@@ -9,6 +9,8 @@ services:
       - "${POSTGRES_APP_PORT}:5432"
     volumes:
       - pgdata-app:/var/lib/postgresql/data
+    networks:
+      - commi-network
 
   postgres-keycloak:
     image: postgres:16
@@ -20,6 +22,8 @@ services:
       - "${POSTGRES_KC_PORT}:5432"
     volumes:
       - pgdata-keycloak:/var/lib/postgresql/data
+    networks:
+      - commi-network
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.0
@@ -38,6 +42,18 @@ services:
       - postgres-keycloak
     volumes:
       - keycloak-data:/opt/keycloak/data
+    networks:
+      - commi-network
+
+  redis:
+    image: redis:7
+    ports:
+      - "${REDIS_PORT}:6379"
+    networks:
+      - commi-network
+    volumes:
+      - redis-data:/data
+
 
   commission-service:
     build:
@@ -49,6 +65,8 @@ services:
       - postgres-app
     ports:
       - "${COMMISSION_SERVICE_PORT}:4000"
+    networks:
+      - commi-network
 
   auth-service:
     build:
@@ -60,11 +78,19 @@ services:
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM}
       KEYCLOAK_URL: ${KEYCLOAK_URL}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      SESSION_SECRET: ${SESSION_SECRET}
+      NODE_ENV: ${ENV_MODE}
+      FRONTEND_URL: ${FRONTEND_URL}
     depends_on:
       - postgres-app
       - keycloak
+      - redis
     ports:
       - "${AUTH_SERVICE_PORT}:4000"
+    networks:
+      - commi-network
 
   payment-service:
     build:
@@ -76,6 +102,8 @@ services:
       - postgres-app
     ports:
       - "${PAYMENT_SERVICE_PORT}:4000"
+    networks:
+      - commi-network
 
   web:
     build:
@@ -87,8 +115,32 @@ services:
       - payment-service
     ports:
       - "${WEB_PORT}:5173"
+    networks:
+      - commi-network
+
+  caddy:
+    image: caddy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:Z
+      - ../apps/web/build:/srv/frontend:Z
+    depends_on:
+      - web
+      - commission-service
+      - auth-service
+      - payment-service
+    networks:
+      - commi-network
 
 volumes:
   pgdata-app:
   pgdata-keycloak:
   keycloak-data:
+  redis-data:
+
+
+networks:
+  commi-network:
+    driver: bridge
