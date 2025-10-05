@@ -116,7 +116,7 @@ importers:
         specifier: ^11.1.0
         version: 11.1.0
       '@types/redis':
-        specifier: ^4.0.11
+        specifier: ^4.0.10
         version: 4.0.11
       connect-redis:
         specifier: ^9.0.0
@@ -5004,7 +5004,7 @@ snapshots:
 
   '@types/yauzl@2.10.3':
     dependencies:
-      '@types/node': 24.5.2
+      '@types/node': 22.18.6
     optional: true
 
   '@typescript-eslint/eslint-plugin@8.44.1(@typescript-eslint/parser@8.44.1(eslint@9.36.0(jiti@2.6.0))(typescript@5.9.2))(eslint@9.36.0(jiti@2.6.0))(typescript@5.9.2)':

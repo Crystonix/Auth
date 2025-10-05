@@ -95,3 +95,20 @@ playwright/.cache/
 *.tgz
 *.tar.gz
 .pnpm-store/
+
+# Rust / Cargo (ignore build artifacts anywhere in the repo)
+target/
+**/target/
+**/debug/
+**/release/
+**/.fingerprint/
+**/.cargo/
+**/.rustc_info.json
+
+# SQLx / Rust tool artifacts
+**/.sqlx/
+
+# Services (explicitly ignore service build dirs)
+services/**/target/
+services/**/debug/
+services/**/.fingerprint/

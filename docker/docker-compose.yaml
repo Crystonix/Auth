@@ -1,145 +1,85 @@
 services:
-  postgres-app:
+  auth_db:
     image: postgres:16
     environment:
-      POSTGRES_USER: ${POSTGRES_APP_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_APP_DB}
+      POSTGRES_DB: ${AUTH_DB}
+      POSTGRES_USER: ${AUTH_DB_USER}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
     ports:
-      - "${POSTGRES_APP_PORT}:5432"
+      - "${AUTH_DB_PORT}:${AUTH_DB_PORT}"
     volumes:
-      - pgdata-app:/var/lib/postgresql/data
+      - data-auth:/var/lib/postgresql/data
     networks:
       - commi-network
 
-  postgres-keycloak:
-    image: postgres:16
+  pgadmin:
+    image: dpage/pgadmin4:latest
     environment:
-      POSTGRES_USER: ${POSTGRES_KC_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_KC_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_KC_DB}
+      PGADMIN_DEFAULT_EMAIL: ${PG_MAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PG_PASSWORD}
     ports:
-      - "${POSTGRES_KC_PORT}:5432"
-    volumes:
-      - pgdata-keycloak:/var/lib/postgresql/data
-    networks:
-      - commi-network
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.0.0
-    command: start-dev
-    environment:
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/${POSTGRES_KC_DB}
-      KC_DB_USERNAME: ${POSTGRES_KC_USER}
-      KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD}
-      KC_HOSTNAME: localhost
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-    ports:
-      - "${KEYCLOAK_PORT}:8080"
+      - "8080:80"
     depends_on:
-      - postgres-keycloak
-    volumes:
-      - keycloak-data:/opt/keycloak/data
-      - ../keycloak/keycloak-providers:/opt/keycloak/providers
+      - auth_db
     networks:
       - commi-network
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     ports:
-      - "${REDIS_PORT}:6379"
+      - "${REDIS_PORT}:${REDIS_PORT}"
     networks:
       - commi-network
+    command: ["redis-server", "--save", "60", "1"]
     volumes:
       - redis-data:/data
 
-
-  commission-service:
-    build:
-      context: ../
-      dockerfile: services/commission-service/Dockerfile
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_APP_USER}:${POSTGRES_APP_PASSWORD}@postgres-app:5432/${POSTGRES_APP_DB}
-    depends_on:
-      - postgres-app
+  redisinsight:
+    image: redislabs/redisinsight:latest
     ports:
-      - "${COMMISSION_SERVICE_PORT}:4000"
+      - "${REDISINSIGHT_PORT}:${REDISINSIGHT_PORT}"
+    depends_on:
+      - redis
     networks:
       - commi-network
+    volumes:
+     - redis-insight-data:/data
 
   auth-service:
     build:
       context: ../
       dockerfile: services/auth-service/Dockerfile
     environment:
-      DATABASE_URL: postgres://${POSTGRES_APP_USER}:${POSTGRES_APP_PASSWORD}@postgres-app:5432/${POSTGRES_APP_DB}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
-      KEYCLOAK_URL: ${KEYCLOAK_URL}
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
-      SESSION_SECRET: ${SESSION_SECRET}
-      NODE_ENV: ${ENV_MODE}
-      FRONTEND_URL: ${FRONTEND_URL}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+      DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
+      AUTH_DB: ${AUTH_DB}
+      AUTH_DB_USER: ${AUTH_DB_USER}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      AUTH_DB_PORT: ${AUTH_DB_PORT}
     depends_on:
-      - postgres-app
-      - keycloak
+      - auth_db
       - redis
     ports:
       - "${AUTH_SERVICE_PORT}:4000"
     networks:
       - commi-network
 
-  payment-service:
-    build:
-      context: ../
-      dockerfile: services/payment-service/Dockerfile
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_APP_USER}:${POSTGRES_APP_PASSWORD}@postgres-app:5432/${POSTGRES_APP_DB}
-    depends_on:
-      - postgres-app
-    ports:
-      - "${PAYMENT_SERVICE_PORT}:4000"
-    networks:
-      - commi-network
-
-  web:
+  web-app:
     build:
       context: ../
       dockerfile: apps/web/Dockerfile
     depends_on:
-      - commission-service
       - auth-service
-      - payment-service
     ports:
-      - "${WEB_PORT}:5173"
-    networks:
-      - commi-network
-
-  caddy:
-    image: caddy:latest
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:Z
-      - ../apps/web/build:/srv/frontend:Z
-    depends_on:
-      - web
-      - commission-service
-      - auth-service
-      - payment-service
+      - "${WEB_APP_PORT}:5173"
     networks:
       - commi-network
 
 volumes:
-  pgdata-app:
-  pgdata-keycloak:
-  keycloak-data:
+  data-auth:
   redis-data:
+  redis-insight-data:
 
 
 networks:
