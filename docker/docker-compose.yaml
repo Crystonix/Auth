@@ -1,5 +1,5 @@
 services:
-  auth_db:
+  auth-db:
     image: postgres:16
     environment:
       POSTGRES_DB: ${AUTH_DB}
@@ -20,7 +20,7 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - auth_db
+      - auth-db
     networks:
       - commi-network
 
@@ -53,12 +53,18 @@ services:
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
+      DISCORD_AUTH_URL: ${DISCORD_AUTH_URL}
+      DISCORD_TOKEN_URL: ${DISCORD_TOKEN_URL}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
+      FRONTEND_URL: ${FRONTEND_URL}
+      REDIS_URL: ${REDIS_URL}
       AUTH_DB: ${AUTH_DB}
       AUTH_DB_USER: ${AUTH_DB_USER}
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
       AUTH_DB_PORT: ${AUTH_DB_PORT}
+      AUTH_DB_URL: ${AUTH_DB_URL}
     depends_on:
-      - auth_db
+      - auth-db
       - redis
     ports:
       - "${AUTH_SERVICE_PORT}:4000"

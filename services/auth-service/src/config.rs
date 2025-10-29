@@ -1,6 +1,9 @@
 use dotenvy::dotenv;
 use std::env;
 use redis::aio::ConnectionManager;
+use base64::engine::general_purpose;
+use base64::Engine;
+
 
 pub struct Config {
     pub port: u16,
@@ -18,11 +21,17 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> Self {
         dotenv().ok();
-        let key_str = env::var("TOKEN_ENCRYPTION_KEY").expect("TOKEN_ENCRYPTION_KEY required");
-        let key_bytes: [u8; 32] = key_str.as_bytes().try_into().expect("Key must be 32 bytes");
+        // Decode the Base64 key
+        let key_str = std::env::var("TOKEN_ENCRYPTION_KEY").expect("TOKEN_ENCRYPTION_KEY required");
+        let key_bytes_vec = general_purpose::STANDARD
+            .decode(key_str)
+            .expect("Failed to decode TOKEN_ENCRYPTION_KEY from Base64");
+        let key_bytes: [u8; 32] = key_bytes_vec
+            .try_into()
+            .expect("Decoded key must be exactly 32 bytes");
 
         Self {
-            port: env::var("PORT").expect("PORT must be set").parse().expect("PORT must be a number"),
+            port: env::var("AUTH_DB_PORT").expect("AUTH_DB_PORT must be set").parse().expect("AUTH_DB_PORT must be a number"),
             database_url: env::var("AUTH_DB_URL").expect("DATABASE_URL must be set"),
             redis_url: env::var("REDIS_URL").expect("REDIS_URL must be set"),
             discord_client_id: env::var("DISCORD_CLIENT_ID").expect("DISCORD_CLIENT_ID must be set"),

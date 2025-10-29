@@ -124,6 +124,7 @@ dependencies = [
  "async-http-client",
  "axum",
  "axum-extra",
+ "base64",
  "bb8",
  "bb8-redis",
  "chrono",
