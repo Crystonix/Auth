@@ -129,6 +129,7 @@ dependencies = [
  "bb8-redis",
  "chrono",
  "dotenvy",
+ "hex",
  "hyper",
  "oauth2",
  "rand 0.8.5",

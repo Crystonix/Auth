@@ -47,7 +47,6 @@ services:
 
   auth-service:
     build:
-      context: ../
       dockerfile: services/auth-service/Dockerfile
     environment:
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
@@ -73,7 +72,6 @@ services:
 
   web-app:
     build:
-      context: ../
       dockerfile: apps/web/Dockerfile
     depends_on:
       - auth-service

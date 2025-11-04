@@ -1,9 +1,5 @@
 use dotenvy::dotenv;
 use std::env;
-use redis::aio::ConnectionManager;
-use base64::engine::general_purpose;
-use base64::Engine;
-
 
 pub struct Config {
     pub port: u16,
@@ -23,9 +19,8 @@ impl Config {
         dotenv().ok();
         // Decode the Base64 key
         let key_str = std::env::var("TOKEN_ENCRYPTION_KEY").expect("TOKEN_ENCRYPTION_KEY required");
-        let key_bytes_vec = general_purpose::STANDARD
-            .decode(key_str)
-            .expect("Failed to decode TOKEN_ENCRYPTION_KEY from Base64");
+        let key_bytes_vec = hex::decode(&key_str)
+            .expect("Failed to decode TOKEN_ENCRYPTION_KEY from HEX");
         let key_bytes: [u8; 32] = key_bytes_vec
             .try_into()
             .expect("Decoded key must be exactly 32 bytes");

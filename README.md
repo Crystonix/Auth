@@ -5,6 +5,9 @@ Monorepo for the commi project. It contains a SvelteKit frontend and a Rust-base
 The Auth Service needs the DB to be setup to compile since we need compile time checks.
 podman compose up -d auth_db
 
+Get Sqlx
+cargo install sqlx-cli
+
 Setup the Database Tables etc.
 sqlx migrate run --database-url postgresql://user:password@localhost:port/db_name from the env
 cargo sqlx prepare --database-url postgresql://user:password@localhost:port/db_name from the env
