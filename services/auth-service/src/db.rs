@@ -9,3 +9,8 @@ pub async fn connect(database_url: &str) -> Result<PgPool> {
         .await?;
     Ok(pool)
 }
+
+pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    sqlx::migrate!("./migrations").run(pool).await?;
+    Ok(())
+}

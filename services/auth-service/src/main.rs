@@ -26,8 +26,9 @@ pub struct AppState {
 async fn main() -> Result<()> {
     let config = Arc::new(Config::from_env());
     let db_pool = Arc::new(connect(&config.database_url).await?);
+    db::run_migrations(&db_pool).await?;
     let http_client = reqwest::Client::new();
-    
+
     let redis_manager = RedisConnectionManager::new(config.redis_url.as_str())?;
     let redis_pool = Pool::builder().max_size(10).build(redis_manager).await?;
 
