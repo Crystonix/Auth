@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
     };
     let state = Arc::new(state);
 
-    let addr = format!("0.0.0.0:{}", state.config.port.clone());
+    let addr = format!("0.0.0.0:{}", state.config.auth_service_port.clone());
 
     let app = Router::new()
         .route("/", get(|| async { "Auth service running" }))

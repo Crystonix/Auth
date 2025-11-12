@@ -2,7 +2,8 @@ use dotenvy::dotenv;
 use std::env;
 
 pub struct Config {
-    pub port: u16,
+    pub auth_service_port: u16,
+    pub auth_db_port: u16,
     pub database_url: String,
     pub redis_url: String,
     pub discord_client_id: String,
@@ -26,7 +27,8 @@ impl Config {
             .expect("Decoded key must be exactly 32 bytes");
 
         Self {
-            port: env::var("AUTH_DB_PORT").expect("AUTH_DB_PORT must be set").parse().expect("AUTH_DB_PORT must be a number"),
+            auth_service_port: env::var("AUTH_SERVICE_PORT").expect("AUTH_SERVICE_PORT must be set").parse().expect("AUTH_SERVICE_PORT must be a number"),
+            auth_db_port: env::var("AUTH_DB_PORT").expect("AUTH_DB_PORT must be set").parse().expect("AUTH_DB_PORT must be a number"),
             database_url: env::var("AUTH_DB_URL").expect("DATABASE_URL must be set"),
             redis_url: env::var("REDIS_URL").expect("REDIS_URL must be set"),
             discord_client_id: env::var("DISCORD_CLIENT_ID").expect("DISCORD_CLIENT_ID must be set"),
