@@ -33,13 +33,18 @@ pub async fn create_oauth_client(state: &Arc<AppState>) -> Client<BasicErrorResp
     client
 
 }
+
+pub async fn login_string(state: State<Arc<AppState>>, jar: CookieJar) -> (CookieJar, Redirect) {
+    login::<String>(state, jar).await
+}
+
 pub async fn login<RV: redis::FromRedisValue>(State(state): State<Arc<AppState>>, jar: CookieJar) -> (CookieJar, Redirect) {
     let client = create_oauth_client(&state).await;
     let (pkce_challenge, _pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let (auth_url, csrf_token) = client
         .authorize_url(CsrfToken::new_random)
-        .add_scope(Scope::new("read".to_string()))
-        .add_scope(Scope::new("write".to_string()))
+        .add_scope(Scope::new("identify".to_string()))
+        .add_scope(Scope::new("email".to_string()))
         .set_pkce_challenge(pkce_challenge)
         .url();
 

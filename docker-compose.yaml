@@ -81,10 +81,29 @@ services:
     networks:
       - commi-network
 
+  caddy:
+    image: caddy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web-app
+      - auth-service
+      - pgadmin
+      - redisinsight
+    networks:
+      - commi-network
+
 volumes:
   data-auth:
   redis-data:
   redis-insight-data:
+  caddy_data:
+  caddy_config:
 
 
 networks:

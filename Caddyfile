@@ -1,0 +1,21 @@
+localhost {
+    # Frontend
+    handle /* {
+        reverse_proxy web-app:5173
+    }
+
+    # Backend API
+    handle_path /api/* {
+        reverse_proxy auth-service:4000
+    }
+
+    # PGAdmin
+    handle_path /pgadmin/* {
+        reverse_proxy pgadmin:80
+    }
+
+    # RedisInsight
+    handle_path /redisinsight/* {
+        reverse_proxy redisinsight:5540
+    }
+}
