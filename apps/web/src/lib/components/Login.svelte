@@ -4,7 +4,7 @@
   function login() {
     loading = true;
     // Redirect to auth-service login endpoint
-    window.location.href = 'http://localhost/api/auth/login';
+    window.location.href = 'http://localhost/api/auth/discord/login';
 
   }
 </script>
