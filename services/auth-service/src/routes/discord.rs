@@ -24,6 +24,25 @@ struct DiscordUser {
     avatar: Option<String>,
 }
 
+use std::fmt;
+
+#[derive(Debug, sqlx::Type)]
+#[sqlx(type_name = "user_role")]
+#[sqlx(rename_all = "lowercase")]
+pub enum UserRole {
+    User,
+    Admin,
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UserRole::User => write!(f, "user"),
+            UserRole::Admin => write!(f, "admin"),
+        }
+    }
+}
+
 pub async fn create_oauth_client(state: &Arc<AppState>) -> Client<BasicErrorResponse, BasicTokenResponse, BasicTokenIntrospectionResponse, StandardRevocableToken, BasicRevocationErrorResponse, EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet> {
     let client = BasicClient::new(ClientId::new(state.config.discord_client_id.clone()))
         .set_client_secret(ClientSecret::new(state.config.discord_client_secret.clone()))
@@ -144,21 +163,26 @@ pub async fn callback(
                 .await
                 .unwrap();
 
+
+            let role = UserRole::User; // default role
+
             // --- Step 7: Save user + tokens in Postgres ---
             sqlx::query!(
-        r#"
-        INSERT INTO users (id, username, discriminator, avatar)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (id) DO UPDATE
-            SET username = EXCLUDED.username,
-                discriminator = EXCLUDED.discriminator,
-                avatar = EXCLUDED.avatar
-        "#,
-        user.id,
-        user.username,
-        user.discriminator,
-        user.avatar
-    )
+                    r#"
+                    INSERT INTO users (id, username, discriminator, avatar, role)
+                    VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (id) DO UPDATE
+                        SET username = EXCLUDED.username,
+                            discriminator = EXCLUDED.discriminator,
+                            avatar = EXCLUDED.avatar,
+                            role = EXCLUDED.role
+                    "#,
+                    user.id,
+                    user.username,
+                    user.discriminator,
+                    user.avatar,
+                    role,
+                )
                 .execute(&*state.db_pool)
                 .await
                 .unwrap();
@@ -182,7 +206,17 @@ pub async fn callback(
             let key = format!("oauth_session:{}", session_id);
             let mut con = state.redis_pool.get().await.unwrap();
 
-            let _: () = con.del(&key).await.unwrap();
+            let session_key = format!("user_session:{}", session_id);
+            let _: () = con.hset_multiple(&session_key, &[
+                ("user_id", &user.id),
+                ("username", &user.username),
+                ("discriminator", &user.discriminator),
+                ("role", &role.to_string()),
+            ]).await.unwrap();
+
+            // Set TTL for 24 hours
+            let _: () = con.expire(&session_key, 24*3600).await.unwrap();
+
 
             format!("Welcome, {}#{}!", user.username, user.discriminator)
         }
