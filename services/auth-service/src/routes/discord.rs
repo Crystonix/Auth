@@ -26,7 +26,7 @@ struct DiscordUser {
 
 use std::fmt;
 
-#[derive(Debug, sqlx::Type)]
+#[derive(Debug, Clone, sqlx::Type)]
 #[sqlx(type_name = "user_role")]
 #[sqlx(rename_all = "lowercase")]
 pub enum UserRole {
@@ -181,7 +181,7 @@ pub async fn callback(
                     user.username,
                     user.discriminator,
                     user.avatar,
-                    role,
+                    role.clone() as UserRole,
                 )
                 .execute(&*state.db_pool)
                 .await
