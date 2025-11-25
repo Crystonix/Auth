@@ -46,6 +46,7 @@ async fn main() -> Result<()> {
         .route("/", get(|| async { "Auth service running" }))
         .route("/auth/discord/login", get(routes::discord::login_string))
         .route("/auth/discord/callback", get(routes::discord::callback))
+        .route("/auth/me", get(routes::discord::me))
         .with_state(state);
 
     // start server
