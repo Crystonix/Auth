@@ -12,7 +12,7 @@ pub struct Config {
     pub discord_auth_url: String,
     pub discord_token_url: String,
     pub frontend_url: String,
-    pub token_encryption_key: [u8; 32],
+    pub encryption_key: [u8; 32],
 }
 
 impl Config {
@@ -37,7 +37,7 @@ impl Config {
             frontend_url: env::var("FRONTEND_URL").expect("FRONTEND_URL must be set"),
             discord_auth_url: env::var("DISCORD_AUTH_URL").expect("DISCORD_AUTH_URL must be set"),
             discord_token_url: env::var("DISCORD_TOKEN_URL").expect("DISCORD_TOKEN_URL must be set"),
-            token_encryption_key: key_bytes,
+            encryption_key: key_bytes,
         }
     }
 }

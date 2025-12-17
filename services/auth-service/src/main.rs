@@ -1,18 +1,17 @@
 mod config;
 mod db;
-mod models;
-mod routes;
+mod logic;
+mod handlers;
 
-use axum::{routing::get, Router, ServiceExt};
+use anyhow::Result;
+use axum::{routing::get, Router};
+use bb8::Pool;
+use bb8_redis::RedisConnectionManager;
 use config::Config;
 use db::connect;
 use oauth2::reqwest;
-use redis::aio::ConnectionManager;
-use std::sync::{Arc, Mutex};
-use redis::Client;
-use anyhow::{Result, Context};
-use bb8::Pool;
-use bb8_redis::RedisConnectionManager;
+use std::sync::Arc;
+use crate::handlers::*;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -44,9 +43,10 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/", get(|| async { "Auth service running" }))
-        .route("/auth/discord/login", get(routes::discord::login_string))
-        .route("/auth/discord/callback", get(routes::discord::callback))
-        .route("/auth/me", get(routes::discord::me))
+        .route("/auth/discord/login", get(login_string))
+        .route("/auth/discord/callback", get(callback))
+        .route("/auth/me", get(me))
+        .route("/auth/refresh", get(refresh_session))
         .with_state(state);
 
     // start server
@@ -58,4 +58,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-
