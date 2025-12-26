@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use axum::extract::{Query, State};
 use axum::http::header;
+use axum::response::{IntoResponse, Redirect};
 use axum_extra::extract::CookieJar;
+use axum_extra::extract::cookie::Cookie;
 use oauth2::{AuthorizationCode, PkceCodeVerifier, TokenResponse};
 use redis::AsyncCommands;
 use crate::AppState;
@@ -14,33 +16,41 @@ pub async fn callback(
     State(state): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
     jar: CookieJar,
-) -> String {
-    // 1. Extract the `code` and `state`
+) -> impl IntoResponse {
+    let frontend_url = &state.config.frontend_url;
+
+    // 1. Get session_id from cookie
+    let session_id = match jar.get("session_id").map(|c| c.value().to_string()) {
+        Some(id) => id,
+        None => {
+            let jar = jar.remove(Cookie::from("session_id"));
+            return (jar, Redirect::to(&format!("{}?error=missing_session", frontend_url))).into_response()
+        }
+    };
+
+     // 2. Get OAuth code
     let code = match params.get("code") {
         Some(c) => AuthorizationCode::new(c.to_string()),
-        None => return "Missing authorization code".into(),
+        None => {
+            let jar = jar.remove(Cookie::from("session_id"));
+            return (jar, Redirect::to(&format!("{}?error=missing_code", frontend_url))).into_response();
+        }
     };
 
     let returned_csrf = params.get("state").cloned();
 
-    // 2. Get session_id from cookie
-    let session_cookie = jar.get("session_id");
-    let Some(session_id) = session_cookie.map(|c| c.value().to_string()) else {
-        return "Missing session cookie".into();
-    };
-
+    // 3. Retrieve PKCE + CSRF from Redis
     let key = format!("oauth_session:{}", session_id);
-    let mut con = state.redis_pool.get().await.unwrap(); // get a pooled connection
-
-    // Retrieve PKCE + CSRF
-    let (pkce_verifier_str, csrf_token_str): (Option<String>, Option<String>) = con
-        .hmget(&key, &["pkce_verifier", "csrf_token"])
-        .await
-        .unwrap();
+    let mut con = state.redis_pool.get().await.expect("Failed to connect to Redis");
+    let (pkce_verifier_str, csrf_token_str): (Option<String>, Option<String>) =
+        con.hmget(&key, &["pkce_verifier", "csrf_token"]).await.expect("Failed to retrieve PKCE + CSRF from Redis");
 
     let pkce_verifier_str = match pkce_verifier_str {
         Some(v) => v,
-        None => return "Session expired or invalid".into(),
+        None => {
+            let jar = jar.remove(Cookie::from("session_id"));
+            return (jar, Redirect::to(&format!("{}?error=session_invalid", frontend_url))).into_response();
+        }
     };
 
     let csrf_token_str = csrf_token_str.unwrap_or_default();
@@ -48,7 +58,7 @@ pub async fn callback(
     // 4. Verify CSRF token
     if let Some(returned_csrf) = returned_csrf {
         if returned_csrf != csrf_token_str {
-            return "CSRF token mismatch".into();
+            return (jar, Redirect::to(&format!("{}?error=csrf_mismatch", frontend_url))).into_response();
         }
     }
 
@@ -75,10 +85,10 @@ pub async fn callback(
                 .header(header::AUTHORIZATION, format!("Bearer {}", access_token))
                 .send()
                 .await
-                .unwrap()
+                .expect("Failed to get Discord User")
                 .json()
                 .await
-                .unwrap();
+                .expect("Failed to get Discord User JSON");
 
             let role = UserRole::User; // default role
 
@@ -101,7 +111,7 @@ pub async fn callback(
             )
                 .execute(&*state.db_pool)
                 .await
-                .unwrap();
+                .expect("Failed to save user + token in Postgres");
 
             if let Some(rt) = refresh_token {
                 sqlx::query!(
@@ -116,11 +126,8 @@ pub async fn callback(
                 )
                     .execute(&*state.db_pool)
                     .await
-                    .unwrap();
+                    .expect("Failed to set refresh token");
             }
-
-            let key = format!("oauth_session:{}", session_id);
-            let mut con = state.redis_pool.get().await.unwrap();
 
             let session_key = format!("user_session:{}", session_id);
             let _: () = con
@@ -134,13 +141,29 @@ pub async fn callback(
                     ],
                 )
                 .await
-                .unwrap();
+                .expect("Failed to create Session");
 
             // Set TTL for 24 hours
-            let _: () = con.expire(&session_key, 24 * 3600).await.unwrap();
+            let _: () = con.expire(&session_key, 24 * 3600).await.expect("Failed to set TTL");
 
-            format!("Welcome, {}#{}!", user.username, user.discriminator)
+            let cookie = Cookie::build(("session_id", session_id.clone()))
+                .path("/")
+                .http_only(true)
+                .secure(true) // true in production
+                .same_site(axum_extra::extract::cookie::SameSite::Lax)
+                .max_age(time::Duration::hours(24))
+                .build();
+
+            let jar = jar.add(cookie);
+
+            (jar, Redirect::to(&frontend_url)).into_response()
+
+
+            // format!("Welcome, {}#{}!", user.username, user.discriminator)
         }
-        Err(err) => format!("OAuth2 exchange failed: {:?}", err),
+        Err(_) => {
+            let jar = jar.remove(Cookie::from("session_id"));
+            (jar, Redirect::to(&format!("{}?error=oauth_failed", frontend_url))).into_response()
+        }
     }
 }

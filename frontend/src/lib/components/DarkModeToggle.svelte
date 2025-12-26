@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  let dark = false;
+  let dark = true;
 
   onMount(() => {
     const stored = localStorage.getItem('theme');
