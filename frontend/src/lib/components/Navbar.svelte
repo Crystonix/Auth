@@ -1,6 +1,7 @@
 <script lang="ts">
   import Login from '$lib/components/Login.svelte';
   import DarkModeToggle from '$lib/components/DarkModeToggle.svelte';
+	import NavLinks from './NavLinks.svelte';
 </script>
 
 <nav class="w-full shadow-md transition-colors duration-500 bg-navbar text-default">
@@ -12,6 +13,10 @@
         <a href="/" class="text-xl font-bold transition-colors duration-500 text-primary">
           MyApp
         </a>
+      </div>
+
+      <div>
+        <NavLinks/>
       </div>
 
       <!-- Right side: Login & Dark Mode -->

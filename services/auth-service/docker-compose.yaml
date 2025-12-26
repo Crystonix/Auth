@@ -1,25 +1,4 @@
 services:
-  caddy:
-    image: caddy:latest
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - app-net
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "5173:5173"
-    networks:
-      - app-net
-
   auth-db:
     image: postgres:16
     environment:
@@ -50,7 +29,7 @@ services:
     ports:
       - "${REDIS_PORT}:${REDIS_PORT}"
     networks:
-      - app-net
+      - commi-network
     command: ["redis-server", "--save", "60", "1"]
     volumes:
       - redis-data:/data
@@ -68,8 +47,7 @@ services:
 
   auth-service:
     build:
-      context: ./services/auth-service
-      dockerfile: Dockerfile
+      dockerfile: services/auth-service/Dockerfile
     environment:
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
@@ -94,12 +72,10 @@ services:
       - app-net
 
 volumes:
-  caddy_data:
-  caddy_config:
   data-auth:
   redis-data:
   redis-insight-data:
 
 networks:
   app-net:
-    driver: bridge
+    external: true

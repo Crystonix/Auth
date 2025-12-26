@@ -29,7 +29,7 @@
 </script>
 
 <button
-  on:click={toggleDark}
+  onclick={toggleDark}
   class="w-10 h-10 rounded-full flex items-center justify-center transition hover:scale-110 bg-surface text-default dark:bg-surface dark:text-default"
 >
   {#if dark}

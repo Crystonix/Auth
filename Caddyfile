@@ -1,7 +1,7 @@
 localhost {
     # Frontend
     handle /* {
-        reverse_proxy web-app:5173
+        reverse_proxy frontend:5173
     }
 
     # Backend API

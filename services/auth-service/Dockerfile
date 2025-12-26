@@ -7,8 +7,7 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev libpq-dev
 WORKDIR /usr/src/app
 
 # Copy source code + SQLx cache
-COPY services/auth-service/ ./
-COPY services/auth-service/.sqlx/ .sqlx/
+COPY  . .
 
 # Build release binary (offline, no DB needed)
 RUN cargo build --release
