@@ -6,13 +6,13 @@ RUN npm install -g pnpm
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
-COPY apps/web/package.json ./apps/web/package.json
+COPY apps/frontend/package.json ./apps/frontend/package.json
 
 RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-WORKDIR /app/apps/web
+WORKDIR /app/apps/frontend
 
 EXPOSE 5173
 
