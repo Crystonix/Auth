@@ -1,3 +1,4 @@
+// src/logic/crypto.rs
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
 use aes_gcm::aead::Aead;
 use aes_gcm::aead::rand_core::RngCore;

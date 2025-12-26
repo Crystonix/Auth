@@ -1,3 +1,4 @@
+// src/logic/models.rs
 use std::fmt;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;

@@ -1,3 +1,4 @@
+// src/main.rs
 mod config;
 mod db;
 mod logic;
