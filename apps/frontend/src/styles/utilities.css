@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* =========================
+   SEMANTIC COLOR UTILITIES
+   ========================= */
+@layer utilities {
+  /* ---------- Backgrounds / Surfaces ---------- */
+  .bg-sunken {
+    background-color: var(--color-surface-sunken-light);
+  }
+  .dark .bg-sunken {
+    background-color: var(--color-surface-sunken-dark);
+  }
+
+  .bg-surface {
+    background-color: var(--color-surface-light);
+  }
+  .dark .bg-surface {
+    background-color: var(--color-surface-dark);
+  }
+
+  .bg-elevated {
+    background-color: var(--color-surface-elevated-light);
+  }
+  .dark .bg-elevated {
+    background-color: var(--color-surface-elevated-dark);
+  }
+
+  .bg-overlay {
+    background-color: var(--color-surface-overlay-light);
+  }
+  .dark .bg-overlay {
+    background-color: var(--color-surface-overlay-dark);
+  }
+
+  /* ---------- Text ---------- */
+  .text-default {
+    color: var(--color-text-light);
+  }
+  .dark .text-default {
+    color: var(--color-text-dark);
+  }
+
+  .text-muted {
+    color: var(--color-text-muted-light);
+  }
+  .dark .text-muted {
+    color: var(--color-text-muted-dark);
+  }
+
+  .text-inverted {
+    color: var(--color-text-inverted-light);
+  }
+  .dark .text-inverted {
+    color: var(--color-text-inverted-dark);
+  }
+
+  /* ---------- Brand / Accent ---------- */
+  .text-primary {
+    color: var(--color-primary);
+  }
+
+  .bg-primary {
+    background-color: var(--color-primary);
+  }
+  .hover\:bg-primary-hover:hover {
+    background-color: var(--color-primary-hover);
+  }
+
+  .text-secondary {
+    color: var(--color-secondary);
+  }
+
+  /* ---------- Borders ---------- */
+  .border-default {
+    border-color: var(--color-border-light);
+  }
+  .dark .border-default {
+    border-color: var(--color-border-dark);
+  }
+
+  .divide-default > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--color-divider-light);
+  }
+  .dark .divide-default > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--color-divider-dark);
+  }
+
+  /* ---------- Status ---------- */
+  .text-success {
+    color: var(--color-success);
+  }
+  .text-error {
+    color: var(--color-error);
+  }
+  .text-warning {
+    color: var(--color-warning);
+  }
+  .text-info {
+    color: var(--color-info);
+  }
+
+  /* ---------- Focus / Ring ---------- */
+  .ring-primary {
+    --tw-ring-color: var(--color-focus-ring);
+    --tw-ring-offset-width: var(--focus-ring-offset);
+    --tw-ring-width: var(--focus-ring-width);
+  }
+}

@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+@import '../styles/theme.css';
+@import '../styles/utilities.css';
+
+/* Global styling with smooth transition using theme variables */
+html, body {
+  @apply font-sans antialiased min-h-screen transition-colors duration-500;
+  background-color: var(--color-background-light);
+  color: var(--color-text-light);
+}
+
+/* Dark mode */
+.dark html, .dark body {
+  background-color: var(--color-background-dark);
+  color: var(--color-text-dark);
+}
+
+/* Typography (prose) */
+.prose {
+  @apply transition-colors duration-500;
+  color: var(--color-text-light);
+}
+.dark .prose {
+  color: var(--color-text-dark);
+  @apply prose-invert;
+}
+
+/* Links */
+a {
+  @apply underline transition-colors duration-300;
+  color: var(--color-primary);
+}
+.dark a {
+  color: var(--color-primary);
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  @apply font-bold transition-colors duration-500;
+  color: var(--color-text-light);
+}
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  color: var(--color-text-dark);
+}
+
+/* Paragraphs and lists */
+p, li {
+  @apply leading-relaxed transition-colors duration-500;
+  color: var(--color-text-light);
+}
+.dark p, .dark li {
+  color: var(--color-text-dark);
+}
+
+/* Form inputs & buttons */
+input, textarea, select, button {
+  @apply rounded-md border placeholder-gray-400 focus:outline-none focus:ring-2 transition-colors duration-300;
+  background-color: var(--color-surface-light);
+  color: var(--color-text-light);
+  border-color: var(--color-border-light);
+  --tw-ring-color: var(--color-primary);
+}
+.dark input, .dark textarea, .dark select, .dark button {
+  background-color: var(--color-surface-dark);
+  color: var(--color-text-dark);
+  border-color: var(--color-border-dark);
+  --tw-ring-color: var(--color-primary);
+}
+
+/* Buttons hover/active effect */
+button {
+  @apply transition transform hover:scale-[1.02] active:scale-100;
+}
