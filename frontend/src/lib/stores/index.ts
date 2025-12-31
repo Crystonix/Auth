@@ -1,1 +1,1 @@
-export * from './user.svelte';
+export * from './user.svelte'

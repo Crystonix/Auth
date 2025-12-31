@@ -1,15 +1,4 @@
-// lib/stores/user.svelte.ts
-export enum Roles {
-    USER = "user",
-    ADMIN = "admin",
-}
-
-export type AuthUser = {
-    id: string;
-    username: string;
-    avatar?: string | null;
-    role: Roles;
-};
+import type { AuthUser, Roles } from "$lib/auth/user";
 
 class User {
     id: string = $state('');
@@ -19,6 +8,7 @@ class User {
     authenticated: boolean = $state(false);
 
     setUser(user: AuthUser) {
+				console.log('User.setUser called with:', user);
         this.id = user.id;
         this.username = user.username;
         this.avatar = user.avatar ?? null;
@@ -27,11 +17,13 @@ class User {
     }
 
     setAuthenticated(role: Roles) {
+				console.log('User.setAuthenticated called with role:', role);
         this.role = role;
         this.authenticated = true;
     }
 
     reset() {
+				console.log('User.reset called');
         this.id = '';
         this.username = '';
         this.avatar = null;

@@ -1,7 +1,12 @@
 <script lang="ts">
-  import { user } from '$lib/stores/user.svelte';
+  // $lib/components/Login.svelte
+	import { user } from "$lib/stores/user.svelte";
   let loading = $state(false);
   let showDropdown = $state(false);
+
+  function toggleDropdown() {
+    showDropdown = !showDropdown;
+  }
 
   function login() {
     loading = true;
@@ -10,10 +15,6 @@
 
   function logout() {
     window.location.href = '/api/auth/logout';
-  }
-
-  function toggleDropdown() {
-    showDropdown = !showDropdown;
   }
 </script>
 
