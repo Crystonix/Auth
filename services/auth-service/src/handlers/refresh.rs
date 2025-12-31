@@ -58,6 +58,11 @@ pub async fn refresh_session(
                     .unwrap();
             }
 
+            let _: () = con
+              .expire(format!("user_session:{}", session_id), 30 * 24 * 3600) // 30 days
+              .await
+              .unwrap_or(());
+
             (
                 StatusCode::OK,
                 Json(json!({"message": "Session refreshed"})),

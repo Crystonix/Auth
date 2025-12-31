@@ -17,7 +17,7 @@ pub async fn callback(
     Query(params): Query<HashMap<String, String>>,
     jar: CookieJar,
 ) -> impl IntoResponse {
-    let frontend_url = &state.config.frontend_url;
+    let frontend_url = "/";
 
     // 1. Get session_id from cookie
     let session_id = match jar.get("session_id").map(|c| c.value().to_string()) {

@@ -8,45 +8,58 @@ use axum_extra::extract::CookieJar;
 use redis::AsyncCommands;
 use serde_json::json;
 use crate::AppState;
+use crate::logic::models::{SessionUser, UserRole};
 
 pub async fn me(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
-) -> (StatusCode, Json<serde_json::Value>) {
-    // 1️⃣ Get session_id from cookie
+) -> (StatusCode, Json<SessionUser>) {
+    // Get session_id from cookie
     let session_id = match jar.get("session_id") {
         Some(c) => c.value().to_string(),
-        None => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({"error": "No session"})),
-            );
-        }
+        None => return (StatusCode::UNAUTHORIZED, Json(SessionUser {
+            id: "".into(),
+            username: "".into(),
+            avatar: None,
+            role: UserRole::User,
+        })),
     };
 
-    // 2️⃣ Get Redis connection
+    // Get Redis connection
     let mut con = state.redis_pool.get().await.unwrap();
 
-    // 3️⃣ Fetch session data
-    let user: HashMap<String, String> = con
-        .hgetall(format!("user_session:{}", session_id))
+    // Fetch session data
+    let user_map: HashMap<String, String> =
+      con.hgetall(format!("user_session:{}", session_id))
         .await
         .unwrap_or_default();
 
-    // 4️⃣ Check if session exists
-    if user.is_empty() {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({"error": "Session expired"})),
-        );
+    // Session expired?
+    if user_map.is_empty() {
+        return (StatusCode::UNAUTHORIZED, Json(SessionUser {
+            id: "".into(),
+            username: "".into(),
+            avatar: None,
+            role: UserRole::User,
+        }));
     }
 
-    // 5️⃣ Optionally extend session TTL to keep it alive
+    // Optionally extend TTL
     let _: () = con
-        .expire(format!("user_session:{}", session_id), 30 * 24 * 3600) // 30 days
-        .await
-        .unwrap_or(());
+      .expire(format!("user_session:{}", session_id), 30 * 24 * 3600)
+      .await
+      .unwrap_or(());
 
-    // 6️⃣ Return user info as JSON
-    (StatusCode::OK, Json(json!(user)))
+    // Map Redis hash to strongly typed struct
+    let session_user = SessionUser {
+        id: user_map.get("id").cloned().unwrap_or_default(),
+        username: user_map.get("username").cloned().unwrap_or_default(),
+        avatar: user_map.get("avatar").cloned(),
+        role: match user_map.get("role").map(|r| r.as_str()) {
+            Some("admin") => UserRole::Admin,
+            _ => UserRole::User,
+        },
+    };
+
+    (StatusCode::OK, Json(session_user))
 }

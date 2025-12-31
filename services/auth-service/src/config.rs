@@ -12,7 +12,6 @@ pub struct Config {
     pub discord_redirect_uri: String,
     pub discord_auth_url: String,
     pub discord_token_url: String,
-    pub frontend_url: String,
     pub encryption_key: [u8; 32],
 }
 
@@ -35,7 +34,6 @@ impl Config {
             discord_client_id: env::var("DISCORD_CLIENT_ID").expect("DISCORD_CLIENT_ID must be set"),
             discord_client_secret: env::var("DISCORD_CLIENT_SECRET").expect("DISCORD_CLIENT_SECRET must be set"),
             discord_redirect_uri: env::var("DISCORD_REDIRECT_URI").expect("DISCORD_REDIRECT_URI must be set"),
-            frontend_url: env::var("FRONTEND_URL").expect("FRONTEND_URL must be set"),
             discord_auth_url: env::var("DISCORD_AUTH_URL").expect("DISCORD_AUTH_URL must be set"),
             discord_token_url: env::var("DISCORD_TOKEN_URL").expect("DISCORD_TOKEN_URL must be set"),
             encryption_key: key_bytes,

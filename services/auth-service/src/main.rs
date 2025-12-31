@@ -12,6 +12,9 @@ use config::Config;
 use db::connect;
 use oauth2::reqwest;
 use std::sync::Arc;
+use std::time::Duration;
+use axum::http::{HeaderValue, Method};
+use tower_http::cors::{Any, CorsLayer};
 use crate::handlers::*;
 
 #[derive(Clone)]
@@ -42,12 +45,20 @@ async fn main() -> Result<()> {
 
     let addr = format!("0.0.0.0:{}", state.config.auth_service_port.clone());
 
+    let cors = CorsLayer::new()
+      .allow_origin("http://localhost:5173".parse::<HeaderValue>()?) // frontend origin
+      .allow_methods(vec![Method::GET, Method::POST, Method::OPTIONS])
+      .allow_headers(Any)
+      .max_age(Duration::from_secs(3600));
+
     let app = Router::new()
         .route("/", get(|| async { "Auth service running" }))
         .route("/auth/discord/login", get(login_string))
         .route("/auth/discord/callback", get(callback))
         .route("/auth/me", get(me))
         .route("/auth/refresh", get(refresh_session))
+        .route("/auth/logout", get(logout))
+        .layer(cors)
         .with_state(state);
 
     // start server
