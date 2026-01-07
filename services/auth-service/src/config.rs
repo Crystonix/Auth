@@ -13,6 +13,7 @@ pub struct Config {
     pub discord_auth_url: String,
     pub discord_token_url: String,
     pub encryption_key: [u8; 32],
+    pub is_production: bool,
 }
 
 impl Config {
@@ -25,6 +26,7 @@ impl Config {
         let key_bytes: [u8; 32] = key_bytes_vec
             .try_into()
             .expect("Decoded key must be exactly 32 bytes");
+        let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
 
         Self {
             auth_service_port: env::var("AUTH_SERVICE_PORT").expect("AUTH_SERVICE_PORT must be set").parse().expect("AUTH_SERVICE_PORT must be a number"),
@@ -37,6 +39,7 @@ impl Config {
             discord_auth_url: env::var("DISCORD_AUTH_URL").expect("DISCORD_AUTH_URL must be set"),
             discord_token_url: env::var("DISCORD_TOKEN_URL").expect("DISCORD_TOKEN_URL must be set"),
             encryption_key: key_bytes,
+            is_production: app_env == "production",
         }
     }
 }

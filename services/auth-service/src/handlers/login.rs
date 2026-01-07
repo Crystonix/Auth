@@ -60,7 +60,7 @@ pub async fn login<RV: redis::FromRedisValue>(
 
     let cookie = Cookie::build(("session_id", session_id.clone()))
         .http_only(true)
-        .secure(true)
+        .secure(state.config.is_production)
         .same_site(axum_extra::extract::cookie::SameSite::Lax)
         .max_age(time::Duration::hours(1))
         .path("/")

@@ -17,14 +17,14 @@ pub async fn callback(
     Query(params): Query<HashMap<String, String>>,
     jar: CookieJar,
 ) -> impl IntoResponse {
-    let frontend_url = "/";
+    let error_url = "/auth/error";
 
     // 1. Get session_id from cookie
     let session_id = match jar.get("session_id").map(|c| c.value().to_string()) {
         Some(id) => id,
         None => {
             let jar = jar.remove(Cookie::from("session_id"));
-            return (jar, Redirect::to(&format!("{}?error=missing_session", frontend_url))).into_response()
+            return (jar, Redirect::to(&format!("{}?error=missing_session", error_url))).into_response()
         }
     };
 
@@ -33,7 +33,7 @@ pub async fn callback(
         Some(c) => AuthorizationCode::new(c.to_string()),
         None => {
             let jar = jar.remove(Cookie::from("session_id"));
-            return (jar, Redirect::to(&format!("{}?error=missing_code", frontend_url))).into_response();
+            return (jar, Redirect::to(&format!("{}?error=missing_code", error_url))).into_response();
         }
     };
 
@@ -49,7 +49,7 @@ pub async fn callback(
         Some(v) => v,
         None => {
             let jar = jar.remove(Cookie::from("session_id"));
-            return (jar, Redirect::to(&format!("{}?error=session_invalid", frontend_url))).into_response();
+            return (jar, Redirect::to(&format!("{}?error=session_invalid", error_url))).into_response();
         }
     };
 
@@ -58,7 +58,7 @@ pub async fn callback(
     // 4. Verify CSRF token
     if let Some(returned_csrf) = returned_csrf {
         if returned_csrf != csrf_token_str {
-            return (jar, Redirect::to(&format!("{}?error=csrf_mismatch", frontend_url))).into_response();
+            return (jar, Redirect::to(&format!("{}?error=csrf_mismatch", error_url))).into_response();
         }
     }
 
@@ -156,14 +156,18 @@ pub async fn callback(
 
             let jar = jar.add(cookie);
 
-            (jar, Redirect::to(&frontend_url)).into_response()
+            let callback_url = match role {
+                UserRole::Admin => "/admin",
+                _ => "/dashboard",
+            };
 
+            (jar, Redirect::to(&callback_url)).into_response()
 
             // format!("Welcome, {}#{}!", user.username, user.discriminator)
         }
         Err(_) => {
             let jar = jar.remove(Cookie::from("session_id"));
-            (jar, Redirect::to(&format!("{}?error=oauth_failed", frontend_url))).into_response()
+            (jar, Redirect::to(&format!("{}?error=oauth_failed", error_url))).into_response()
         }
     }
 }
