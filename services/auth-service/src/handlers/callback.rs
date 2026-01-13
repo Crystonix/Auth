@@ -1,15 +1,20 @@
 // src/handlers/callback.rs
 use std::collections::HashMap;
 use std::sync::Arc;
+
 use axum::extract::{Query, State};
-use axum::http::header;
 use axum::response::{IntoResponse, Redirect};
-use axum_extra::extract::CookieJar;
-use axum_extra::extract::cookie::Cookie;
+use axum_extra::extract::{cookie::Cookie, CookieJar};
 use oauth2::{AuthorizationCode, PkceCodeVerifier, TokenResponse};
-use redis::AsyncCommands;
+use reqwest::Client as ReqwestClient;
+use anyhow::Result;
+
+use crate::logic::session::{
+    delete_oauth_session, store_user_session, update_user_refresh_token, UserSession,
+};
 use crate::AppState;
-use crate::logic::models::{DiscordUser, UserRole};
+use crate::logic::models::db::UserRole;
+use crate::logic::models::DiscordUser;
 use crate::logic::oauth::create_oauth_client;
 
 pub async fn callback(
@@ -19,155 +24,113 @@ pub async fn callback(
 ) -> impl IntoResponse {
     let error_url = "/auth/error";
 
-    // 1. Get session_id from cookie
+    async fn fail_redirect(jar: CookieJar, error_url: &str, error: &str) -> impl IntoResponse {
+        let jar = jar.remove(Cookie::from("session_id"));
+        (jar, Redirect::to(&format!("{}?error={}", error_url, error)))
+    }
+
     let session_id = match jar.get("session_id").map(|c| c.value().to_string()) {
         Some(id) => id,
-        None => {
-            let jar = jar.remove(Cookie::from("session_id"));
-            return (jar, Redirect::to(&format!("{}?error=missing_session", error_url))).into_response()
-        }
+        None => return fail_redirect(jar, error_url, "missing_session").await.into_response(),
     };
 
-     // 2. Get OAuth code
     let code = match params.get("code") {
         Some(c) => AuthorizationCode::new(c.to_string()),
-        None => {
-            let jar = jar.remove(Cookie::from("session_id"));
-            return (jar, Redirect::to(&format!("{}?error=missing_code", error_url))).into_response();
-        }
+        None => return fail_redirect(jar, error_url, "missing_code").await.into_response(),
     };
 
-    let returned_csrf = params.get("state").cloned();
-
-    // 3. Retrieve PKCE + CSRF from Redis
-    let key = format!("oauth_session:{}", session_id);
-    let mut con = state.redis_pool.get().await.expect("Failed to connect to Redis");
-    let (pkce_verifier_str, csrf_token_str): (Option<String>, Option<String>) =
-        con.hmget(&key, &["pkce_verifier", "csrf_token"]).await.expect("Failed to retrieve PKCE + CSRF from Redis");
-
-    let pkce_verifier_str = match pkce_verifier_str {
-        Some(v) => v,
-        None => {
-            let jar = jar.remove(Cookie::from("session_id"));
-            return (jar, Redirect::to(&format!("{}?error=session_invalid", error_url))).into_response();
-        }
+    let oauth_session = match crate::logic::session::get_oauth_session(&state.redis_client, &session_id).await {
+        Ok(Some(s)) => s,
+        _ => return fail_redirect(jar, error_url, "session_invalid").await.into_response(),
     };
 
-    let csrf_token_str = csrf_token_str.unwrap_or_default();
-
-    // 4. Verify CSRF token
-    if let Some(returned_csrf) = returned_csrf {
-        if returned_csrf != csrf_token_str {
-            return (jar, Redirect::to(&format!("{}?error=csrf_mismatch", error_url))).into_response();
+    // CSRF check
+    if let Some(returned_state) = params.get("state") {
+        if returned_state != &oauth_session.csrf_token {
+            return fail_redirect(jar, error_url, "csrf_mismatch").await.into_response();
         }
     }
 
-    let pkce_verifier = PkceCodeVerifier::new(pkce_verifier_str);
-
-    // 5. Exchange code for access + refresh token
     let client = create_oauth_client(&state).await;
 
-    let token_result = client
-        .exchange_code(code)
-        .set_pkce_verifier(pkce_verifier)
-        .request_async(&state.http_client)
-        .await;
+    // Exchange code for tokens
+    let token = match client
+      .exchange_code(code)
+      .set_pkce_verifier(PkceCodeVerifier::new(oauth_session.pkce_verifier.clone()))
+      .request_async(&state.oauth2_client)
+      .await
+    {
+        Ok(t) => t,
+        Err(_) => return fail_redirect(jar, error_url, "oauth_failed").await.into_response(),
+    };
 
-    match token_result {
-        Ok(token) => {
-            let access_token = token.access_token().secret();
-            let refresh_token = token.refresh_token().map(|r| r.secret().to_string());
+    let access_token = token.access_token().secret();
+    let refresh_token_bytes = token
+      .refresh_token()
+      .map(|r| r.secret().as_bytes().to_vec());
+    let nonce_bytes = refresh_token_bytes.as_ref().map(|_| rand::random::<[u8; 12]>());
 
-            // --- Step 6: Fetch Discord user profile ---
-            let user: DiscordUser = state
-                .http_client
-                .get("https://discord.com/api/users/@me")
-                .header(header::AUTHORIZATION, format!("Bearer {}", access_token))
-                .send()
-                .await
-                .expect("Failed to get Discord User")
-                .json()
-                .await
-                .expect("Failed to get Discord User JSON");
+    // Fetch Discord user info
+    let http_client = ReqwestClient::new();
+    let user = match fetch_discord_user(&http_client, access_token).await {
+        Ok(u) => u,
+        Err(_) => return fail_redirect(jar, error_url, "user_fetch_failed").await.into_response(),
+    };
 
-            let role = UserRole::User; // default role
+    // Create UserSession
+    let role = UserRole::User;
+    let mut user_session = UserSession {
+        user_id: user.id.clone(),
+        username: user.username.clone(),
+        discriminator: user.discriminator.clone(),
+        role: role.to_string(),
+        refresh_token: refresh_token_bytes.clone(),
+        nonce: nonce_bytes,
+    };
 
-            // --- Step 7: Save user + tokens in Postgres ---
-            sqlx::query!(
-                r#"
-                    INSERT INTO users (id, username, discriminator, avatar, role)
-                    VALUES ($1, $2, $3, $4, $5)
-                    ON CONFLICT (id) DO UPDATE
-                        SET username = EXCLUDED.username,
-                            discriminator = EXCLUDED.discriminator,
-                            avatar = EXCLUDED.avatar,
-                            role = EXCLUDED.role
-                    "#,
-                user.id,
-                user.username,
-                user.discriminator,
-                user.avatar,
-                role.clone() as UserRole,
-            )
-                .execute(&*state.db_pool)
-                .await
-                .expect("Failed to save user + token in Postgres");
-
-            if let Some(rt) = refresh_token {
-                sqlx::query!(
-                    r#"
-            INSERT INTO oauth_tokens (user_id, refresh_token)
-            VALUES ($1, $2)
-            ON CONFLICT (user_id) DO UPDATE
-                SET refresh_token = EXCLUDED.refresh_token
-            "#,
-                    user.id,
-                    rt
-                )
-                    .execute(&*state.db_pool)
-                    .await
-                    .expect("Failed to set refresh token");
-            }
-
-            let session_key = format!("user_session:{}", session_id);
-            let _: () = con
-                .hset_multiple(
-                    &session_key,
-                    &[
-                        ("user_id", &user.id),
-                        ("username", &user.username),
-                        ("discriminator", &user.discriminator),
-                        ("role", &role.to_string()),
-                    ],
-                )
-                .await
-                .expect("Failed to create Session");
-
-            // Set TTL for 24 hours
-            let _: () = con.expire(&session_key, 24 * 3600).await.expect("Failed to set TTL");
-
-            let cookie = Cookie::build(("session_id", session_id.clone()))
-                .path("/")
-                .http_only(true)
-                .secure(true) // true in production
-                .same_site(axum_extra::extract::cookie::SameSite::Lax)
-                .max_age(time::Duration::hours(24))
-                .build();
-
-            let jar = jar.add(cookie);
-
-            let callback_url = match role {
-                UserRole::Admin => "/admin",
-                _ => "/dashboard",
-            };
-
-            (jar, Redirect::to(&callback_url)).into_response()
-
-            // format!("Welcome, {}#{}!", user.username, user.discriminator)
-        }
-        Err(_) => {
-            let jar = jar.remove(Cookie::from("session_id"));
-            (jar, Redirect::to(&format!("{}?error=oauth_failed", error_url))).into_response()
-        }
+    // Store or update refresh token atomically
+    if let (Some(rt), Some(nonce)) = (refresh_token_bytes, nonce_bytes) {
+        let _ = update_user_refresh_token(&state.redis_client, &session_id, rt, nonce, 30 * 24 * 3600).await;
     }
+
+    // Fallback: store session as JSON if no refresh token
+    if store_user_session(&state.redis_client, &session_id, &user_session, 24 * 3600).await.is_err() {
+        return fail_redirect(jar, error_url, "session_store_failed").await.into_response();
+    }
+
+    let _ = delete_oauth_session(&state.redis_client, &session_id).await;
+
+    // Set cookie + redirect
+    let cookie = Cookie::build(("session_id", session_id.clone()))
+      .path("/")
+      .http_only(true)
+      .secure(state.config.is_production)
+      .same_site(axum_extra::extract::cookie::SameSite::Lax)
+      .max_age(time::Duration::hours(24))
+      .build();
+    let jar = jar.add(cookie);
+
+    let redirect_url = match role {
+        UserRole::Admin => "/admin",
+        _ => "/dashboard",
+    };
+
+    (jar, Redirect::to(redirect_url)).into_response()
+}
+
+async fn fetch_discord_user(client: &ReqwestClient, token: &str) -> Result<DiscordUser> {
+    let resp = client
+      .get("https://discord.com/api/users/@me")
+      .bearer_auth(token)
+      .send()
+      .await
+      .map_err(|e| anyhow::anyhow!("Discord request failed: {e}"))?;
+
+    let resp = resp.error_for_status()
+      .map_err(|e| anyhow::anyhow!("Discord response error: {e}"))?;
+
+    let user = resp.json::<DiscordUser>().await
+      .map_err(|e| anyhow::anyhow!("Discord JSON parse error: {e}"))?;
+
+    Ok(user)
 }

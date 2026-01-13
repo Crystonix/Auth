@@ -6,53 +6,47 @@ use axum::http::StatusCode;
 use axum::Json;
 use axum_extra::extract::CookieJar;
 use redis::AsyncCommands;
-use serde_json::json;
 use crate::AppState;
-use crate::logic::models::{SessionUser, UserRole};
+use crate::logic::models::*;
 
 pub async fn me(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
 ) -> (StatusCode, Json<SessionUser>) {
-    // Get session_id from cookie
+    // 1️⃣ Get session_id from cookie
     let session_id = match jar.get("session_id") {
         Some(c) => c.value().to_string(),
-        None => return (StatusCode::UNAUTHORIZED, Json(SessionUser {
-            id: "".into(),
-            username: "".into(),
-            avatar: None,
-            role: UserRole::User,
-        })),
+        None => return unauthorized(),
     };
 
-    // Get Redis connection
-    let mut con = state.redis_pool.get().await.unwrap();
+    // 2️⃣ Get Redis connection
+    let mut con = match state.redis_client.get_multiplexed_async_connection().await {
+        Ok(c) => c,
+        Err(_) => return unauthorized(),
+    };
 
-    // Fetch session data
-    let user_map: HashMap<String, String> =
-      con.hgetall(format!("user_session:{}", session_id))
-        .await
-        .unwrap_or_default();
+    // 3️⃣ Fetch session data from Redis
+    let user_map: HashMap<String, String> = match con
+      .hgetall(format!("user_session:{}", session_id))
+      .await
+    {
+        Ok(map) => map,
+        Err(_) => return unauthorized(),
+    };
 
-    // Session expired?
+    // 4️⃣ Session expired?
     if user_map.is_empty() {
-        return (StatusCode::UNAUTHORIZED, Json(SessionUser {
-            id: "".into(),
-            username: "".into(),
-            avatar: None,
-            role: UserRole::User,
-        }));
+        return unauthorized();
     }
 
-    // Optionally extend TTL
-    let _: () = con
+    // 5️⃣ Optionally extend TTL
+    let _: Result<(), _> = con
       .expire(format!("user_session:{}", session_id), 30 * 24 * 3600)
-      .await
-      .unwrap_or(());
+      .await;
 
-    // Map Redis hash to strongly typed struct
+    // 6️⃣ Map Redis hash to strongly typed struct
     let session_user = SessionUser {
-        id: user_map.get("id").cloned().unwrap_or_default(),
+        id: user_map.get("user_id").cloned().unwrap_or_default(),
         username: user_map.get("username").cloned().unwrap_or_default(),
         avatar: user_map.get("avatar").cloned(),
         role: match user_map.get("role").map(|r| r.as_str()) {
@@ -62,4 +56,17 @@ pub async fn me(
     };
 
     (StatusCode::OK, Json(session_user))
+}
+
+/// Helper for unauthorized response
+fn unauthorized() -> (StatusCode, Json<SessionUser>) {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(SessionUser {
+            id: "".into(),
+            username: "".into(),
+            avatar: None,
+            role: UserRole::User,
+        }),
+    )
 }

@@ -6,21 +6,39 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev libpq-dev
 
 WORKDIR /usr/src/app
 
-# Copy source code + SQLx cache
-COPY  . .
+# Copy Cargo files first
+COPY Cargo.toml Cargo.lock ./
+RUN cargo build --release || true
 
-# Build release binary (offline, no DB needed)
+# Copy full source
+COPY . .
+
+# Build release binary
 RUN cargo build --release
 
 # Stage 2 — Runtime
 FROM debian:bookworm-slim
 
+# Install runtime deps
 RUN apt-get update && apt-get install -y libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy binary
+# Set logging
+ENV RUST_LOG=info
+
+# Create non-root user
+RUN useradd -m appuser
+USER appuser
+
+# Copy binary from builder
 COPY --from=builder /usr/src/app/target/release/auth-service .
 
+# Strip binary
+RUN strip ./auth-service
+
+# Expose port
 EXPOSE 4000
+
+# Start service
 CMD ["./auth-service"]

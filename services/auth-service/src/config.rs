@@ -14,6 +14,7 @@ pub struct Config {
     pub discord_token_url: String,
     pub encryption_key: [u8; 32],
     pub is_production: bool,
+    pub frontend_url: String,
 }
 
 impl Config {
@@ -40,6 +41,7 @@ impl Config {
             discord_token_url: env::var("DISCORD_TOKEN_URL").expect("DISCORD_TOKEN_URL must be set"),
             encryption_key: key_bytes,
             is_production: app_env == "production",
+            frontend_url: env::var("FRONTEND_URL").expect("FRONTEND_URL must be set"),
         }
     }
 }
