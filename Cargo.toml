@@ -1,4 +1,5 @@
 [workspace]
+resolver = "3"
 members = [
-	"services/auth-service",
+	"services/auth-service", "services/commissions-service",
 ]
