@@ -2,20 +2,22 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::logic::models::postgres::{OAuthProvider, UserRole};
+use crate::logic::models::{oauth::DiscordUser, OAuthSession, UserSession};
+use crate::logic::oauth::create_oauth_client;
+use crate::queries::oauth_tokens::upsert_oauth_token;
+use crate::queries::redis::session::{delete_oauth_session, get_oauth_session, store_user_session};
+use crate::queries::user_providers::upsert_user_provider;
+use crate::queries::users::upsert_user;
+use crate::AppState;
+use anyhow::Result;
 use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Redirect};
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use oauth2::{AuthorizationCode, PkceCodeVerifier, TokenResponse};
 use reqwest::Client as ReqwestClient;
-use anyhow::Result;
 
-use crate::logic::session::{
-    delete_oauth_session, store_user_session, update_user_refresh_token, UserSession,
-};
-use crate::AppState;
-use crate::logic::models::db::UserRole;
-use crate::logic::models::DiscordUser;
-use crate::logic::oauth::create_oauth_client;
+const PROVIDER_DISCORD: OAuthProvider = OAuthProvider::Discord;
 
 pub async fn callback(
     State(state): State<Arc<AppState>>,
@@ -24,83 +26,77 @@ pub async fn callback(
 ) -> impl IntoResponse {
     let error_url = "/auth/error";
 
-    async fn fail_redirect(jar: CookieJar, error_url: &str, error: &str) -> impl IntoResponse {
+    let fail_redirect = |jar: CookieJar, error| async move {
         let jar = jar.remove(Cookie::from("session_id"));
         (jar, Redirect::to(&format!("{}?error={}", error_url, error)))
-    }
-
-    let session_id = match jar.get("session_id").map(|c| c.value().to_string()) {
-        Some(id) => id,
-        None => return fail_redirect(jar, error_url, "missing_session").await.into_response(),
     };
 
+    // 1) Validate OAuth session from cookie + Redis
+    let (session_id, oauth_session) = match validate_oauth_session(&state, &jar).await {
+        Ok(s) => s,
+        Err(e) => return fail_redirect(jar, e).await.into_response(),
+    };
+
+    // 2) CSRF check
+    if let Err(e) = verify_csrf(&oauth_session, params.get("state")) {
+        return fail_redirect(jar, e).await.into_response();
+    }
+
+    // 3) Extract authorization code
     let code = match params.get("code") {
         Some(c) => AuthorizationCode::new(c.to_string()),
-        None => return fail_redirect(jar, error_url, "missing_code").await.into_response(),
+        None => return fail_redirect(jar, "missing_code").await.into_response(),
     };
 
-    let oauth_session = match crate::logic::session::get_oauth_session(&state.redis_client, &session_id).await {
-        Ok(Some(s)) => s,
-        _ => return fail_redirect(jar, error_url, "session_invalid").await.into_response(),
-    };
-
-    // CSRF check
-    if let Some(returned_state) = params.get("state") {
-        if returned_state != &oauth_session.csrf_token {
-            return fail_redirect(jar, error_url, "csrf_mismatch").await.into_response();
-        }
-    }
-
+    // 4) Exchange code for OAuth tokens
     let client = create_oauth_client(&state).await;
-
-    // Exchange code for tokens
     let token = match client
       .exchange_code(code)
       .set_pkce_verifier(PkceCodeVerifier::new(oauth_session.pkce_verifier.clone()))
       .request_async(&state.oauth2_client)
-      .await
-    {
+      .await {
         Ok(t) => t,
-        Err(_) => return fail_redirect(jar, error_url, "oauth_failed").await.into_response(),
+        Err(_) => return fail_redirect(jar, error_url).await.into_response(),
     };
 
     let access_token = token.access_token().secret();
     let refresh_token_bytes = token
       .refresh_token()
       .map(|r| r.secret().as_bytes().to_vec());
-    let nonce_bytes = refresh_token_bytes.as_ref().map(|_| rand::random::<[u8; 12]>());
 
-    // Fetch Discord user info
-    let http_client = ReqwestClient::new();
-    let user = match fetch_discord_user(&http_client, access_token).await {
+    // 5) Fetch Discord user info
+    let discord_user = match fetch_discord_user_info(&ReqwestClient::new(), access_token).await {
         Ok(u) => u,
-        Err(_) => return fail_redirect(jar, error_url, "user_fetch_failed").await.into_response(),
+        Err(e) => return fail_redirect(jar, e).await.into_response(),
     };
 
-    // Create UserSession
-    let role = UserRole::User;
-    let mut user_session = UserSession {
-        user_id: user.id.clone(),
-        username: user.username.clone(),
-        discriminator: user.discriminator.clone(),
-        role: role.to_string(),
-        refresh_token: refresh_token_bytes.clone(),
-        nonce: nonce_bytes,
+    // 6) Upsert user in DB
+    let db_user = match upsert_user_record(&state, &discord_user).await {
+        Ok(u) => u,
+        Err(e) => return fail_redirect(jar, e).await.into_response(),
     };
 
-    // Store or update refresh token atomically
-    if let (Some(rt), Some(nonce)) = (refresh_token_bytes, nonce_bytes) {
-        let _ = update_user_refresh_token(&state.redis_client, &session_id, rt, nonce, 30 * 24 * 3600).await;
+    // 7) Upsert provider account
+    if let Err(e) = upsert_provider_record(&state, db_user.id, &discord_user).await {
+        return fail_redirect(jar, e).await.into_response();
     }
 
-    // Fallback: store session as JSON if no refresh token
-    if store_user_session(&state.redis_client, &session_id, &user_session, 24 * 3600).await.is_err() {
-        return fail_redirect(jar, error_url, "session_store_failed").await.into_response();
+    // 8) Store refresh token in DB if present
+    if let Some(rt) = refresh_token_bytes {
+        if upsert_oauth_token(&state.db_pool, db_user.id, rt).await.is_err() {
+            return fail_redirect(jar, "token_store_failed").await.into_response();
+        }
     }
 
+    // 9) Create ephemeral session in Redis
+    if create_ephemeral_session(&state, db_user.id, &session_id, UserRole::User).await.is_err() {
+        return fail_redirect(jar, "session_store_failed").await.into_response();
+    }
+
+    // 10) Delete OAuth session
     let _ = delete_oauth_session(&state.redis_client, &session_id).await;
 
-    // Set cookie + redirect
+    // 11) Set cookie + redirect
     let cookie = Cookie::build(("session_id", session_id.clone()))
       .path("/")
       .http_only(true)
@@ -110,27 +106,107 @@ pub async fn callback(
       .build();
     let jar = jar.add(cookie);
 
-    let redirect_url = match role {
-        UserRole::Admin => "/admin",
-        _ => "/dashboard",
-    };
+    let redirect_url = "/dashboard";
 
     (jar, Redirect::to(redirect_url)).into_response()
 }
 
-async fn fetch_discord_user(client: &ReqwestClient, token: &str) -> Result<DiscordUser> {
-    let resp = client
-      .get("https://discord.com/api/users/@me")
+/////////////////////////
+// Helper Functions
+/////////////////////////
+
+async fn validate_oauth_session(
+    state: &AppState,
+    jar: &CookieJar,
+) -> Result<(String, OAuthSession), &'static str> {
+    let session_id = jar.get("session_id")
+      .map(|c| c.value().to_string())
+      .ok_or("missing_session")?;
+
+    let oauth_session = get_oauth_session(&state.redis_client, &session_id)
+      .await
+      .map_err(|_| "session_invalid")?
+      .ok_or("session_invalid")?;
+
+    Ok((session_id, oauth_session))
+}
+
+
+fn verify_csrf(oauth_session: &OAuthSession, returned_state: Option<&String>) -> Result<(), &'static str> {
+    if let Some(state) = returned_state {
+        if state != &oauth_session.csrf_token {
+            return Err("csrf_mismatch");
+        }
+    }
+    Ok(())
+}
+
+
+async fn fetch_discord_user_info(client: &ReqwestClient, token: &str) -> Result<DiscordUser, &'static str> {
+    let resp = client.get("https://discord.com/api/users/@me")
       .bearer_auth(token)
       .send()
       .await
-      .map_err(|e| anyhow::anyhow!("Discord request failed: {e}"))?;
+      .map_err(|_| "user_fetch_failed")?;
 
-    let resp = resp.error_for_status()
-      .map_err(|e| anyhow::anyhow!("Discord response error: {e}"))?;
+    let resp = resp.error_for_status().map_err(|_| "user_fetch_failed")?;
+    resp.json::<DiscordUser>().await.map_err(|_| "user_fetch_failed")
+}
 
-    let user = resp.json::<DiscordUser>().await
-      .map_err(|e| anyhow::anyhow!("Discord JSON parse error: {e}"))?;
+async fn upsert_user_record(
+    state: &AppState,
+    discord_user: &DiscordUser,
+) -> Result<crate::logic::models::postgres::User, &'static str> {
+    let role = UserRole::User;
+    let user_id = discord_user.id.parse::<i32>().unwrap_or_default();
 
-    Ok(user)
+    upsert_user(
+        &state.db_pool,
+        user_id,
+        &discord_user.username,
+        discord_user.avatar.as_deref(),
+        role,
+    ).await.map_err(|_| "user_upsert_failed")
+}
+
+async fn upsert_provider_record(
+    state: &AppState,
+    user_id: i32,
+    discord_user: &DiscordUser,
+) -> Result<(), &'static str> {
+    upsert_user_provider(
+        &state.db_pool,
+        user_id,
+        PROVIDER_DISCORD,
+        &discord_user.id,
+        discord_user.discriminator.as_deref(),
+        discord_user.avatar.as_deref(),
+        None,
+    ).await.map_err(|_| "provider_upsert_failed")?;
+
+    Ok(())
+}
+
+async fn create_ephemeral_session(
+    state: &AppState,
+    user_id: i32,
+    session_id: &str,
+    role: UserRole,
+) -> Result<(), &'static str> {
+    let now = chrono::Utc::now().naive_utc();
+    let user_session = UserSession {
+        session_id: session_id.to_string(),
+        user_id,
+        role,
+        session_version: 1,
+        created_at: now,
+        expires_at: now + chrono::Duration::hours(24),
+        last_activity: now,
+        ip_address: None,
+        user_agent: None,
+    };
+
+    store_user_session(&state.redis_client, session_id, &user_session, 24 * 3600)
+      .await
+      .map_err(|_| "session_store_failed")
 }

@@ -53,11 +53,11 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/", get(|| async { "Auth service running" }))
-        .route("/auth/discord/login", get(login_handler))
-        .route("/auth/discord/callback", get(callback))
-        .route("/auth/me", get(me))
-        .route("/auth/refresh", get(refresh_session))
-        .route("/auth/logout", get(logout))
+        .route("/discord/login", get(login_handler))
+        .route("/discord/callback", get(callback))
+        .route("/me", get(me))
+        .route("/refresh", get(refresh_session))
+        .route("/logout", get(logout))
         .layer(cors)
         .with_state(state);
 

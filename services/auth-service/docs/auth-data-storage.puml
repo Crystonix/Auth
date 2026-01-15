@@ -1,0 +1,66 @@
+@startuml
+!theme plain
+
+package "Redis (Ephemeral)" {
+  class OAuthSession {
+    +session_id: UUID
+    +csrf_token: string
+    +pkce_verifier: string
+    +nonce: string
+  }
+
+  class UserSession {
+    +session_id: UUID
+    +user_id: integer
+    +role: string
+    +session_version: integer
+    +created_at: timestamp
+    +expires_at: timestamp
+    +last_activity: timestamp
+    +ip_address: string
+    +user_agent: string
+  }
+}
+
+package "Postgres (Persistent)" {
+  class Users {
+    +id: integer
+    +username: string
+    +avatar: string
+    +role: string
+    +created_at: timestamp
+    +updated_at: timestamp
+    +last_login: timestamp
+    +login_count: integer
+  }
+
+  class UserProviders {
+    +id: integer
+    +user_id: integer
+    +provider: string
+    +provider_user_id: string
+    +discriminator: string
+    +avatar: string
+    +created_at: timestamp
+    +updated_at: timestamp
+  }
+
+  class OAuthTokens {
+    +id: integer
+    +user_provider_id: integer
+    +encrypted_refresh_token: bytes
+    +previous_refresh_token: bytes
+    +created_at: timestamp
+    +updated_at: timestamp
+    +last_token_rotation: timestamp
+  }
+}
+
+' Relationships
+Users --> UserProviders : "has"
+UserProviders --> OAuthTokens : "has"
+UserSession --> Users : "references"
+
+' Optional: ordering inside Redis
+OAuthSession -down-> UserSession
+@enduml

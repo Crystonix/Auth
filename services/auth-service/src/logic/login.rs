@@ -1,6 +1,8 @@
 use axum::extract::State;
 use axum::response::Redirect;
 use axum_extra::extract::{cookie::Cookie, CookieJar};
+use crate::queries::redis::session::store_oauth_session;
+
 use oauth2::{
 	CsrfToken, PkceCodeChallenge
 	, Scope,
@@ -10,8 +12,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::logic::oauth::create_oauth_client;
-use crate::logic::session::store_oauth_session;
 use crate::AppState;
+use crate::logic::models::OAuthSession;
 
 /// Handles Discord OAuth2 login (redirect to Discord)
 pub async fn login(
@@ -27,7 +29,7 @@ pub async fn login(
 	store_oauth_session(
 		&state.redis_client,
 		&session_id,
-		&crate::logic::session::OAuthSession {
+		&OAuthSession {
 			csrf_token: csrf_token.secret().to_string(),
 			pkce_verifier: pkce_verifier.secret().to_string(),
 			nonce: "".to_string(), // not needed for pure OAuth2
@@ -42,7 +44,7 @@ pub async fn login(
 
 	// 3) Build authorization URL
 	let (auth_url, _csrf_token) = client
-		.authorize_url(CsrfToken::new_random)
+		.authorize_url(|| csrf_token.clone())
 		.add_scope(Scope::new("identify".into()))
 		.add_scope(Scope::new("email".into()))
 		.set_pkce_challenge(pkce_challenge)

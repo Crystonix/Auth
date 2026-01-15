@@ -1,57 +1,59 @@
 use sqlx::{PgPool, Result};
 use crate::logic::models::OAuthToken;
 
-/// Store or rotate refresh token
+/// Store or rotate refresh token for a given provider account
 pub async fn upsert_oauth_token(
 	pool: &PgPool,
-	user_id: &str,
-	provider: &str,
+	user_provider_id: i32,
 	refresh_token: Vec<u8>,
 ) -> Result<OAuthToken> {
 	sqlx::query_as!(
         OAuthToken,
         r#"
-        INSERT INTO oauth_tokens (user_id, provider, refresh_token)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, provider) DO UPDATE
+        INSERT INTO oauth_tokens (user_provider_id, encrypted_refresh_token, previous_refresh_token, last_token_rotation)
+        VALUES ($1, $2, NULL, NOW())
+        ON CONFLICT (user_provider_id) DO UPDATE
         SET
-            refresh_token = EXCLUDED.refresh_token,
+            previous_refresh_token = oauth_tokens.encrypted_refresh_token,
+            encrypted_refresh_token = EXCLUDED.encrypted_refresh_token,
+            last_token_rotation = NOW(),
             updated_at = NOW()
         RETURNING
             id,
-            user_id,
-            provider,
-            refresh_token,
+            user_provider_id,
+            encrypted_refresh_token,
+            previous_refresh_token,
             created_at,
-            updated_at
+            updated_at,
+            last_token_rotation
         "#,
-        user_id,
-        provider,
+        user_provider_id,
         refresh_token
     )
 		.fetch_one(pool)
 		.await
 }
 
-/// Get refresh token for a user
+/// Get refresh token for a provider account
 pub async fn get_oauth_token(
 	pool: &PgPool,
-	user_id: &str,
+	user_provider_id: i32,
 ) -> Result<Option<OAuthToken>> {
 	sqlx::query_as!(
         OAuthToken,
         r#"
         SELECT
             id,
-            user_id,
-            provider,
-            refresh_token,
+            user_provider_id,
+            encrypted_refresh_token,
+            previous_refresh_token,
             created_at,
-            updated_at
+            updated_at,
+            last_token_rotation
         FROM oauth_tokens
-        WHERE user_id = $1
+        WHERE user_provider_id = $1
         "#,
-        user_id
+        user_provider_id
     )
 		.fetch_optional(pool)
 		.await
@@ -60,14 +62,14 @@ pub async fn get_oauth_token(
 /// Delete refresh token (logout / revoke)
 pub async fn delete_oauth_token(
 	pool: &PgPool,
-	user_id: &str,
+	user_provider_id: i32,
 ) -> Result<()> {
 	sqlx::query!(
         r#"
         DELETE FROM oauth_tokens
-        WHERE user_id = $1
+        WHERE user_provider_id = $1
         "#,
-        user_id
+        user_provider_id
     )
 		.execute(pool)
 		.await?;

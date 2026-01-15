@@ -1,39 +1,37 @@
 use sqlx::{PgPool, Result};
 use crate::logic::models::{User, UserRole};
 
-/// Insert or update a user (Discord login upsert)
+/// Insert or update a user by internal id
 pub async fn upsert_user(
 	pool: &PgPool,
-	id: &str,
+	id: i32,
 	username: &str,
-	discriminator: &str,
 	avatar: Option<&str>,
 	role: UserRole,
 ) -> Result<User> {
 	sqlx::query_as!(
         User,
         r#"
-        INSERT INTO users (id, username, discriminator, avatar, role)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO users (id, username, avatar, role)
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT (id) DO UPDATE
         SET
             username = EXCLUDED.username,
-            discriminator = EXCLUDED.discriminator,
             avatar = EXCLUDED.avatar,
             role = EXCLUDED.role,
             updated_at = NOW()
         RETURNING
             id,
             username,
-            discriminator,
             avatar,
             role AS "role: UserRole",
             created_at,
-            updated_at
+            updated_at,
+            last_login,
+            login_count
         "#,
         id,
         username,
-        discriminator,
         avatar,
         role as UserRole
     )
@@ -42,18 +40,19 @@ pub async fn upsert_user(
 }
 
 /// Fetch user by id
-pub async fn get_user_by_id(pool: &PgPool, id: &str) -> Result<Option<User>> {
+pub async fn get_user_by_id(pool: &PgPool, id: i32) -> Result<Option<User>> {
 	sqlx::query_as!(
         User,
         r#"
         SELECT
             id,
             username,
-            discriminator,
             avatar,
             role AS "role: UserRole",
             created_at,
-            updated_at
+            updated_at,
+            last_login,
+            login_count
         FROM users
         WHERE id = $1
         "#,
@@ -66,7 +65,7 @@ pub async fn get_user_by_id(pool: &PgPool, id: &str) -> Result<Option<User>> {
 /// Update user role (admin promotion, etc.)
 pub async fn update_user_role(
 	pool: &PgPool,
-	id: &str,
+	id: i32,
 	role: UserRole,
 ) -> Result<()> {
 	sqlx::query!(

@@ -10,14 +10,17 @@ WORKDIR /usr/src/app
 COPY Cargo.toml Cargo.lock ./
 RUN cargo build --release || true
 
+ENV SQLX_OFFLINE=true
+
 # Copy full source
 COPY . .
+COPY .sqlx ./sqlx
 
 # Build release binary
 RUN cargo build --release
 
 # Stage 2 — Runtime
-FROM debian:bookworm-slim
+FROM debian:stable-slim
 
 # Install runtime deps
 RUN apt-get update && apt-get install -y libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
@@ -33,9 +36,6 @@ USER appuser
 
 # Copy binary from builder
 COPY --from=builder /usr/src/app/target/release/auth-service .
-
-# Strip binary
-RUN strip ./auth-service
 
 # Expose port
 EXPOSE 4000

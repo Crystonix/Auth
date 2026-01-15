@@ -1,2 +1,4 @@
 pub mod users;
-mod oauth_tokens;
+pub mod oauth_tokens;
+pub mod user_providers;
+pub(crate) mod redis;

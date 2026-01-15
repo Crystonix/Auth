@@ -1,36 +1,13 @@
-// src/logic/session.rs
+// src/queries/redis/session.rs
 use anyhow::Result;
 use redis::AsyncCommands;
 use redis::Client;
 use serde::{Deserialize, Serialize};
+use crate::logic::models::{OAuthSession, UserSession};
 
 /// ------------------------ Config ------------------------
 const USER_SESSION_TTL: usize = 30 * 24 * 3600; // 30 days
 const OAUTH_SESSION_TTL: usize = 10 * 60; // 10 minutes
-
-/// ------------------------ Models ------------------------
-#[derive(Serialize, Deserialize, Clone)]
-pub struct OAuthSession {
-    pub csrf_token: String,
-    pub pkce_verifier: String,
-    pub nonce: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct UserSession {
-    pub user_id: String,
-    pub username: String,
-    pub discriminator: String,
-    pub role: String,
-    pub refresh_token: Option<Vec<u8>>, // encrypted
-    pub nonce: Option<[u8; 12]>,
-}
-
-impl UserSession {
-    pub fn is_valid(&self) -> bool {
-        !self.user_id.is_empty()
-    }
-}
 
 /// ------------------------ Key helpers ------------------------
 fn oauth_key(session_id: &str) -> String {

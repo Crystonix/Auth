@@ -1,4 +1,4 @@
-// src/db.rs
+// src/postgres
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use anyhow::Result;
@@ -11,7 +11,7 @@ pub async fn connect(database_url: &str) -> Result<PgPool> {
     Ok(pool)
 }
 
-pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::migrate!("./migrations").run(pool).await?;
     Ok(())
 }

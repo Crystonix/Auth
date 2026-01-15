@@ -1,0 +1,30 @@
+@startuml
+!theme plain
+title Discord OAuth2 Login Flow
+
+actor "User" as U
+participant "Browser" as B
+participant "Axum App" as A
+participant "Redis (Ephemeral)" as R
+participant "Discord OAuth2" as D
+
+== Step 1: Generate session and secrets ==
+U -> B : Click "Login with Discord"
+B -> A : GET /login
+A -> A : Generate session_id (UUID)\nGenerate PKCE challenge & verifier\nGenerate CSRF token
+
+== Step 2: Store OAuth session in Redis ==
+A -> R : store_oauth_session(session_id, CSRF, PKCE, nonce, expiry=10min)
+
+== Step 3: Build OAuth2 client and auth URL ==
+A -> A : create_oauth_client(AppState)
+A -> A : build authorization URL with:\n- CSRF token\n- PKCE challenge\n- Scopes: identify, email
+
+== Step 4: Set session cookie ==
+A -> B : Set "session_id" cookie\n(httpOnly, Secure, SameSite=Lax, max-age=1h)
+
+== Step 5: Redirect to Discord ==
+A -> B : Redirect to Discord OAuth2 URL
+B -> D : Request authorization page
+
+@enduml
