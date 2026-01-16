@@ -4,12 +4,6 @@ localhost {
         reverse_proxy auth-service:4000
     }
 
-    # Commissions service
-    handle_path /commissions/* {
-        reverse_proxy commissions-service:5000
-    }
-
-
     # PGAdmin: preserve /pgadmin prefix
     handle_path /pgadmin/* {
         reverse_proxy pgadmin:80
