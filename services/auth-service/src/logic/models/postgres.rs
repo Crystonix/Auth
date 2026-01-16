@@ -20,7 +20,7 @@ impl fmt::Display for UserRole {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::Type)]
 #[sqlx(type_name = "oauth_provider")]
 #[sqlx(rename_all = "lowercase")]
 pub enum OAuthProvider {

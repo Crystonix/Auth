@@ -1,5 +1,4 @@
 // src/handlers/me.rs
-use std::collections::HashMap;
 use std::sync::Arc;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -25,7 +24,7 @@ pub async fn me(
         Err(_) => return unauthorized(),
     };
 
-    // 3️⃣ Fetch session data from Redis (JSON)
+    // 3️⃣ Fetch session JSON from Redis
     let key = format!("user_session:{}", session_id);
     let session_json: Option<String> = match con.get(&key).await {
         Ok(v) => v,
@@ -38,34 +37,36 @@ pub async fn me(
     };
 
     // 4️⃣ Deserialize into UserSession
-    let user_session: UserSession = match serde_json::from_str(&session_json) {
+    let mut user_session: UserSession = match serde_json::from_str(&session_json) {
         Ok(s) => s,
         Err(_) => return unauthorized(),
     };
 
-    // 5️⃣ Optionally extend TTL
+    // 5️⃣ Extend TTL
     let _: Result<(), _> = con.expire(&key, 30 * 24 * 3600).await;
 
-    // 6️⃣ Map to API struct
+    // 6️⃣ Resolve avatar URL
+    let avatar_url = user_session.avatar_url();
+
+    // 7️⃣ Map to API struct
     let session_user = SessionUser {
         id: user_session.user_id,
         username: user_session.username,
-        avatar: user_session.avatar,
+        avatar: avatar_url,
         role: user_session.role,
     };
 
     (StatusCode::OK, Json(session_user))
 }
 
-/// Helper for unauthorized response
 fn unauthorized() -> (StatusCode, Json<SessionUser>) {
     (
         StatusCode::UNAUTHORIZED,
         Json(SessionUser {
-            id: -1,
-            username: "".into(),
-            avatar: None,
-            role: UserRole::User,
+        id: -1,
+        username: "".into(),
+        avatar: None,
+        role: UserRole::User,
         }),
     )
 }

@@ -96,7 +96,7 @@ pub async fn callback(
     }
 
     // 9) Create ephemeral session in Redis
-    if create_ephemeral_session(&state, &db_user, &session_id).await.is_err() {
+    if create_ephemeral_session(&state, &db_user, &user_provider, &session_id).await.is_err() {
         return fail_redirect(jar, "session_store_failed").await.into_response();
     }
 
@@ -216,6 +216,7 @@ async fn upsert_provider_record(
 async fn create_ephemeral_session(
     state: &AppState,
     user: &User,
+    provider: &UserProvider,
     session_id: &str,
 ) -> Result<(), &'static str> {
     let now = chrono::Utc::now().naive_utc();
@@ -223,8 +224,10 @@ async fn create_ephemeral_session(
         session_id: session_id.to_string(),
         user_id: user.id,
         username: user.username.to_string(),
-        avatar: user.avatar.clone(),
+        provider_user_id: Some(provider.provider_user_id.clone()),
+        avatar: provider.avatar.clone(),
         role: user.role.clone(),
+        provider: provider.provider.clone(),
         session_version: 1,
         created_at: now,
         expires_at: now + chrono::Duration::hours(24),
