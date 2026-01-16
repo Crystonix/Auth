@@ -3,12 +3,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::logic::models::postgres::{OAuthProvider, UserRole};
-use crate::logic::models::{oauth::DiscordUser, OAuthSession, UserSession};
+use crate::logic::models::{oauth::DiscordUser, OAuthSession, User, UserProvider, UserSession};
 use crate::logic::oauth::create_oauth_client;
-use crate::queries::oauth_tokens::upsert_oauth_token;
-use crate::queries::redis::session::{delete_oauth_session, get_oauth_session, store_user_session};
-use crate::queries::user_providers::upsert_user_provider;
-use crate::queries::users::upsert_user;
 use crate::AppState;
 use anyhow::Result;
 use axum::extract::{Query, State};
@@ -16,6 +12,8 @@ use axum::response::{IntoResponse, Redirect};
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use oauth2::{AuthorizationCode, PkceCodeVerifier, TokenResponse};
 use reqwest::Client as ReqwestClient;
+use crate::logic::crypto::encrypt_token;
+use crate::queries::*;
 
 const PROVIDER_DISCORD: OAuthProvider = OAuthProvider::Discord;
 
@@ -60,9 +58,6 @@ pub async fn callback(
     };
 
     let access_token = token.access_token().secret();
-    let refresh_token_bytes = token
-      .refresh_token()
-      .map(|r| r.secret().as_bytes().to_vec());
 
     // 5) Fetch Discord user info
     let discord_user = match fetch_discord_user_info(&ReqwestClient::new(), access_token).await {
@@ -77,19 +72,31 @@ pub async fn callback(
     };
 
     // 7) Upsert provider account
-    if let Err(e) = upsert_provider_record(&state, db_user.id, &discord_user).await {
-        return fail_redirect(jar, e).await.into_response();
-    }
+    let user_provider = match upsert_provider_record(&state, db_user.id, &discord_user).await {
+        Ok(up) => up,
+        Err(e) => return fail_redirect(jar, e).await.into_response(),
+    };
 
     // 8) Store refresh token in DB if present
-    if let Some(rt) = refresh_token_bytes {
-        if upsert_oauth_token(&state.db_pool, db_user.id, rt).await.is_err() {
+    if let Some(rt) = token.refresh_token() {
+        let (encrypted_rt, nonce) = encrypt_token(&state.config.encryption_key, rt.secret())
+          .expect("Failed to encrypt");
+
+        // Use the provider ID here instead of db_user.id
+        if let Err(e) = upsert_oauth_token(
+            &state.db_pool,
+            user_provider.id,
+            encrypted_rt,
+            nonce,
+        ).await
+        {
+            tracing::error!("Failed to upsert OAuth token: {:?}", e);
             return fail_redirect(jar, "token_store_failed").await.into_response();
         }
     }
 
     // 9) Create ephemeral session in Redis
-    if create_ephemeral_session(&state, db_user.id, &session_id, UserRole::User).await.is_err() {
+    if create_ephemeral_session(&state, &db_user, &session_id).await.is_err() {
         return fail_redirect(jar, "session_store_failed").await.into_response();
     }
 
@@ -156,25 +163,41 @@ async fn fetch_discord_user_info(client: &ReqwestClient, token: &str) -> Result<
 async fn upsert_user_record(
     state: &AppState,
     discord_user: &DiscordUser,
-) -> Result<crate::logic::models::postgres::User, &'static str> {
-    let role = UserRole::User;
-    let user_id = discord_user.id.parse::<i32>().unwrap_or_default();
+) -> Result<User, &'static str> {
+    use crate::queries::user_providers::get_user_provider;
+    use crate::queries::users::insert_user;
+    use crate::queries::users::get_user_by_id;
 
-    upsert_user(
+    // 1) Check if a user provider already exists for this Discord ID
+    if let Ok(Some(provider)) = get_user_provider(
         &state.db_pool,
-        user_id,
+        PROVIDER_DISCORD,
+        &discord_user.id,
+    ).await {
+        // Fetch the linked internal user
+        if let Ok(Some(user)) = get_user_by_id(&state.db_pool, provider.user_id).await {
+            return Ok(user);
+        }
+    }
+
+    // 2) No existing provider → insert a new internal user
+    insert_user(
+        &state.db_pool,
         &discord_user.username,
         discord_user.avatar.as_deref(),
-        role,
-    ).await.map_err(|_| "user_upsert_failed")
+        UserRole::User,
+    )
+      .await
+      .map_err(|_| "user_insert_failed")
 }
+
 
 async fn upsert_provider_record(
     state: &AppState,
     user_id: i32,
     discord_user: &DiscordUser,
-) -> Result<(), &'static str> {
-    upsert_user_provider(
+) -> Result<UserProvider, &'static str> {
+    let user_provider = upsert_user_provider(
         &state.db_pool,
         user_id,
         PROVIDER_DISCORD,
@@ -182,22 +205,26 @@ async fn upsert_provider_record(
         discord_user.discriminator.as_deref(),
         discord_user.avatar.as_deref(),
         None,
-    ).await.map_err(|_| "provider_upsert_failed")?;
+    )
+      .await
+      .map_err(|_| "provider_upsert_failed")?;
 
-    Ok(())
+    Ok(user_provider)
 }
+
 
 async fn create_ephemeral_session(
     state: &AppState,
-    user_id: i32,
+    user: &User,
     session_id: &str,
-    role: UserRole,
 ) -> Result<(), &'static str> {
     let now = chrono::Utc::now().naive_utc();
     let user_session = UserSession {
         session_id: session_id.to_string(),
-        user_id,
-        role,
+        user_id: user.id,
+        username: user.username.to_string(),
+        avatar: user.avatar.clone(),
+        role: user.role.clone(),
         session_version: 1,
         created_at: now,
         expires_at: now + chrono::Duration::hours(24),

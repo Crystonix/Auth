@@ -24,7 +24,9 @@ pub struct SessionUser {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserSession {
 	pub session_id: String,              // UUID as string
-	pub user_id: i32,                    // internal user ID
+	pub user_id: i32,
+	pub username: String,                // internal username
+	pub avatar: Option<String>,          // optional avatar URL// internal user ID
 	pub role: UserRole,
 	pub session_version: u32,            // incremental session version
 	pub created_at: NaiveDateTime,

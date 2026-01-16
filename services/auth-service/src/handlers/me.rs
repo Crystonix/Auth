@@ -5,7 +5,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use axum_extra::extract::CookieJar;
-use redis::AsyncCommands;
+use ::redis::AsyncCommands;
 use crate::AppState;
 use crate::logic::models::*;
 
@@ -25,34 +25,33 @@ pub async fn me(
         Err(_) => return unauthorized(),
     };
 
-    // 3️⃣ Fetch session data from Redis
-    let user_map: HashMap<String, String> = match con
-      .hgetall(format!("user_session:{}", session_id))
-      .await
-    {
-        Ok(map) => map,
+    // 3️⃣ Fetch session data from Redis (JSON)
+    let key = format!("user_session:{}", session_id);
+    let session_json: Option<String> = match con.get(&key).await {
+        Ok(v) => v,
         Err(_) => return unauthorized(),
     };
 
-    // 4️⃣ Session expired?
-    if user_map.is_empty() {
-        return unauthorized();
-    }
+    let session_json = match session_json {
+        Some(v) => v,
+        None => return unauthorized(),
+    };
+
+    // 4️⃣ Deserialize into UserSession
+    let user_session: UserSession = match serde_json::from_str(&session_json) {
+        Ok(s) => s,
+        Err(_) => return unauthorized(),
+    };
 
     // 5️⃣ Optionally extend TTL
-    let _: Result<(), _> = con
-      .expire(format!("user_session:{}", session_id), 30 * 24 * 3600)
-      .await;
+    let _: Result<(), _> = con.expire(&key, 30 * 24 * 3600).await;
 
-    // 6️⃣ Map Redis hash to strongly typed struct
+    // 6️⃣ Map to API struct
     let session_user = SessionUser {
-        id: user_map.get("user_id").cloned().unwrap_or_default(),
-        username: user_map.get("username").cloned().unwrap_or_default(),
-        avatar: user_map.get("avatar").cloned(),
-        role: match user_map.get("role").map(|r| r.as_str()) {
-            Some("admin") => UserRole::Admin,
-            _ => UserRole::User,
-        },
+        id: user_session.user_id,
+        username: user_session.username,
+        avatar: user_session.avatar,
+        role: user_session.role,
     };
 
     (StatusCode::OK, Json(session_user))
@@ -63,7 +62,7 @@ fn unauthorized() -> (StatusCode, Json<SessionUser>) {
     (
         StatusCode::UNAUTHORIZED,
         Json(SessionUser {
-            id: "".into(),
+            id: -1,
             username: "".into(),
             avatar: None,
             role: UserRole::User,

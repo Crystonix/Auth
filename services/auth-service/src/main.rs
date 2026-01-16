@@ -6,7 +6,7 @@ pub mod handlers;
 pub mod queries;
 use crate::handlers::*;
 use anyhow::Result;
-use axum::http::{HeaderValue, Method};
+use axum::http::{HeaderValue, Method, StatusCode};
 use axum::{routing::get, Router};
 use config::Config;
 use sqlx::PgPool;
@@ -59,6 +59,7 @@ async fn main() -> Result<()> {
         .route("/refresh", get(refresh_session))
         .route("/logout", get(logout))
         .layer(cors)
+        .fallback(|| async { (StatusCode::NOT_FOUND, "fallback") })
         .with_state(state);
 
     // start server

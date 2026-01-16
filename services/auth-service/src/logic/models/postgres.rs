@@ -66,8 +66,13 @@ pub struct UserProvider {
 pub struct OAuthToken {
 	pub id: i32,
 	pub user_provider_id: i32,
+
 	pub encrypted_refresh_token: Vec<u8>,
+	pub refresh_token_nonce: Vec<u8>,
+
 	pub previous_refresh_token: Option<Vec<u8>>,
+	pub previous_refresh_token_nonce: Option<Vec<u8>>,
+
 	pub created_at: DateTime<Utc>,
 	pub updated_at: DateTime<Utc>,
 	pub last_token_rotation: Option<DateTime<Utc>>,

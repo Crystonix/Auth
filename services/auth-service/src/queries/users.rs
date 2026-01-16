@@ -2,9 +2,8 @@ use sqlx::{PgPool, Result};
 use crate::logic::models::{User, UserRole};
 
 /// Insert or update a user by internal id
-pub async fn upsert_user(
+pub async fn insert_user(
 	pool: &PgPool,
-	id: i32,
 	username: &str,
 	avatar: Option<&str>,
 	role: UserRole,
@@ -12,14 +11,8 @@ pub async fn upsert_user(
 	sqlx::query_as!(
         User,
         r#"
-        INSERT INTO users (id, username, avatar, role)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (id) DO UPDATE
-        SET
-            username = EXCLUDED.username,
-            avatar = EXCLUDED.avatar,
-            role = EXCLUDED.role,
-            updated_at = NOW()
+        INSERT INTO users (username, avatar, role)
+        VALUES ($1, $2, $3)
         RETURNING
             id,
             username,
@@ -30,7 +23,6 @@ pub async fn upsert_user(
             last_login,
             login_count
         "#,
-        id,
         username,
         avatar,
         role as UserRole
@@ -38,6 +30,7 @@ pub async fn upsert_user(
 		.fetch_one(pool)
 		.await
 }
+
 
 /// Fetch user by id
 pub async fn get_user_by_id(pool: &PgPool, id: i32) -> Result<Option<User>> {

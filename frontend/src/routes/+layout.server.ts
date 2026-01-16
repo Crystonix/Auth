@@ -8,9 +8,11 @@ export const load: LayoutServerLoad = async ({ fetch, cookies }) => {
     .map(c => `${c.name}=${c.value}`)
     .join('; ');
 
-  const res = await fetch('http://auth-service:4000/auth/me', {
+  const res = await fetch('http://auth-service:4000/me', {
     headers: { cookie: cookieHeader }
   });
+
+  console.log("Res: ", res, "Cookie Header: ", cookieHeader);
 
   if (!res.ok) {
     return { user: null };

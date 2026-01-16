@@ -1,2 +1,0 @@
-ALTER TABLE users
-ALTER COLUMN login_count SET NOT NULL;

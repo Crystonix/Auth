@@ -34,7 +34,9 @@ CREATE TABLE oauth_tokens (
   id SERIAL PRIMARY KEY,
   user_provider_id INTEGER NOT NULL REFERENCES user_providers(id) ON DELETE CASCADE,
   encrypted_refresh_token BYTEA NOT NULL,
+  refresh_token_nonce BYTEA NOT NULL,
   previous_refresh_token BYTEA,
+  previous_refresh_token_nonce BYTEA,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_token_rotation TIMESTAMPTZ,
@@ -42,4 +44,5 @@ CREATE TABLE oauth_tokens (
   revoked_at TIMESTAMPTZ,
   CONSTRAINT oauth_tokens_user_provider_id_unique UNIQUE (user_provider_id)
 );
+
 CREATE INDEX idx_oauth_tokens_last_rotation ON oauth_tokens(last_token_rotation);
