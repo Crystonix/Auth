@@ -2,6 +2,7 @@
   import Login from '$lib/components/Login.svelte';
   import DarkModeToggle from '$lib/components/DarkModeToggle.svelte';
 	import NavLinks from './NavLinks.svelte';
+  import homeicon from '$lib/assets/homeicon.svg'
 </script>
 
 <nav class="w-full shadow-md transition-colors duration-500 bg-navbar text-default">
@@ -10,9 +11,13 @@
 
       <!-- Logo / Branding -->
       <div class="shrink-0">
-        <a href="/" class="text-xl font-bold transition-colors duration-500 text-primary">
-          MyApp
-        </a>
+        <button class="homeButton">
+          <svg width="24", height="24">{homeicon}</svg>
+        </button>
+      </div>
+        
+      <div class="appLogo">
+        <h1>Discord Authenticator</h1>
       </div>
 
       <div>

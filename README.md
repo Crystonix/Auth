@@ -14,3 +14,4 @@ cargo sqlx prepare --database-url postgresql://user:password@localhost:port/db_n
 
 Now we can start we rest of the containers.
 docker compose up -d
+
