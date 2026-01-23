@@ -10,11 +10,11 @@
 
   function login() {
     loading = true;
-    window.location.href = '/api/auth/discord/login';
+    window.location.href = '/auth/discord/login';
   }
 
   function logout() {
-    window.location.href = '/api/auth/logout';
+    window.location.href = '/auth/logout';
   }
 </script>
 

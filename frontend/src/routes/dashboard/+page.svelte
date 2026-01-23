@@ -1,7 +1,7 @@
 <script lang="ts">
-
+	import { user } from "$lib/stores";
 </script>
 
 <section>
-	<p>Welcome user</p>
+	<p>Welcome {user.username}</p>
 </section>

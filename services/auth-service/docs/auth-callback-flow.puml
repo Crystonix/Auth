@@ -1,0 +1,38 @@
+@startuml
+!theme plain
+actor Client
+participant "Auth Service\n(Rust / Axum)" as Auth
+participant "Redis\n(Ephemeral)" as Redis
+participant "Postgres\n(Persistent)" as Postgres
+participant "OAuth Provider\n(Discord / Google)" as Provider
+
+== Login Flow ==
+Client -> Auth : GET /login?provider=discord
+Auth -> Provider : Redirect user for OAuth2 login
+Provider -> Client : OAuth callback URL with code & state
+Client -> Auth : GET /callback?code=xxx&state=yyy
+Auth -> Redis : Store OAuthSession {csrf_token, pkce_verifier, nonce}
+Auth -> Postgres : Upsert User & UserProvider
+Auth -> Postgres : Upsert OAuthToken (store refresh_token)
+Auth -> Redis : Create UserSession {session_id, user_id, role, session_version, expires_at, ip, ua}
+Auth -> Client : Set session cookie
+
+== Access Protected Resource ==
+Client -> Auth : GET /api/resource (with session cookie)
+Auth -> Redis : Validate UserSession {session_id, session_version, last_activity}
+Auth -> Redis : Update last_activity
+Auth -> Postgres : Optionally fetch user / roles if needed
+Auth -> Client : Return resource
+
+== Token Rotation ==
+Auth -> Postgres : Fetch OAuthToken for user_provider_id
+Auth -> Provider : Refresh access token using refresh_token
+Auth -> Postgres : Update OAuthToken {encrypted_refresh_token, previous_refresh_token, last_token_rotation}
+Auth -> Redis : Optional: update UserSession if session_version changes
+
+== Logout / Revoke ==
+Client -> Auth : POST /logout
+Auth -> Redis : Delete UserSession
+Auth -> Postgres : Delete / revoke OAuthToken
+Client <- Auth : 200 OK
+@enduml

@@ -1,76 +1,113 @@
 // src/handlers/refresh.rs
-use crate::logic::crypto::{decrypt_token, encrypt_token};
-use crate::logic::oauth::create_oauth_client;
+use crate::logic::{
+    crypto::{decrypt_token, encrypt_token},
+    oauth::create_oauth_client,
+};
 use crate::AppState;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use axum_extra::extract::CookieJar;
 use oauth2::{RefreshToken, TokenResponse};
-use redis::AsyncCommands;
 use serde_json::json;
 use std::sync::Arc;
+
+use crate::queries::oauth_tokens::{get_oauth_token, upsert_oauth_token};
+use crate::queries::redis::session::{get_user_session, store_user_session};
 
 pub async fn refresh_session(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
-) -> (StatusCode, Json<serde_json::Value>) {
-    let session_id = match jar.get("session_id") {
-        Some(c) => c.value().to_string(),
-        None => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({"error": "No session"})),
-            );
-        }
-    };
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    // 1️⃣ Get session_id from cookie
+    let session_id = jar.get("session_id")
+      .map(|c| c.value().to_string())
+      .ok_or_else(|| (
+          StatusCode::UNAUTHORIZED,
+          Json(json!({"error": "No session"}))
+      ))?;
 
-    let mut con = state.redis_pool.get().await.unwrap();
+    // 2️⃣ Load ephemeral session from Redis (for metadata)
+    let mut session = get_user_session(&state.redis_client, &session_id)
+      .await
+      .map_err(|_| (
+          StatusCode::UNAUTHORIZED,
+          Json(json!({"error": "Failed to load session"}))
+      ))?
+      .ok_or((
+          StatusCode::UNAUTHORIZED,
+          Json(json!({"error": "Session not found"}))
+      ))?;
 
-    // Get refresh token + nonce
-    let (encrypted_rt, nonce): (Vec<u8>, [u8; 12]) = con
-        .hmget(
-            format!("user_session:{}", session_id),
-            &["refresh_token", "nonce"],
-        )
-        .await
-        .unwrap();
+    // 3️⃣ Load refresh token from Postgres
+    let token_row = get_oauth_token(&state.db_pool, session.user_id)
+      .await
+      .map_err(|_| (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(json!({"error": "Failed to load refresh token"}))
+      ))?
+      .ok_or((
+          StatusCode::UNAUTHORIZED,
+          Json(json!({"error": "No refresh token available"}))
+      ))?;
 
-    let refresh_token = decrypt_token(&state.config.encryption_key, &encrypted_rt, &nonce);
+    // 4️⃣ Decrypt refresh token
+    let refresh_token_str = decrypt_token(
+        &state.config.encryption_key,
+        &token_row.encrypted_refresh_token,
+        &token_row.refresh_token_nonce,
+    ).map_err(|_| (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({"error": "Failed to decrypt refresh token"}))
+    ))?;
 
+    // 5️⃣ Exchange refresh token for new access & refresh tokens
     let client = create_oauth_client(&state).await;
-    let token_result = client
-        .exchange_refresh_token(&RefreshToken::new(refresh_token))
-        .request_async(&state.http_client)
-        .await;
+    let token = client.exchange_refresh_token(&RefreshToken::new(refresh_token_str))
+      .request_async(&state.oauth2_client)
+      .await
+      .map_err(|_| (
+          StatusCode::UNAUTHORIZED,
+          Json(json!({"error": "Failed to refresh token"}))
+      ))?;
 
-    match token_result {
-        Ok(token) => {
-            // Update Redis with new refresh token
-            if let Some(rt) = token.refresh_token() {
-                let (enc_rt, nonce_bytes) = encrypt_token(&state.config.encryption_key, rt.secret());
-                let _: () = con
-                    .hset_multiple(
-                        format!("user_session:{}", session_id),
-                        &[("refresh_token", enc_rt), ("nonce", Vec::from(nonce_bytes))],
-                    )
-                    .await
-                    .unwrap();
-            }
+    // 6️⃣ Encrypt new refresh token if present
+    if let Some(new_rt) = token.refresh_token() {
+        let (encrypted_rt, nonce) = encrypt_token(&state.config.encryption_key, new_rt.secret())
+          .map_err(|_| (
+              StatusCode::INTERNAL_SERVER_ERROR,
+              Json(json!({"error": "Failed to encrypt refresh token"}))
+          ))?;
 
-            let _: () = con
-              .expire(format!("user_session:{}", session_id), 30 * 24 * 3600) // 30 days
-              .await
-              .unwrap_or(());
-
-            (
-                StatusCode::OK,
-                Json(json!({"message": "Session refreshed"})),
-            )
-        }
-        Err(_) => (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({"error": "Failed to refresh"})),
-        ),
+        // 7️⃣ Upsert token into Postgres
+        upsert_oauth_token(
+            &state.db_pool,
+            session.user_id,
+            encrypted_rt,
+            nonce,
+        )
+          .await
+          .map_err(|_| (
+              StatusCode::INTERNAL_SERVER_ERROR,
+              Json(json!({"error": "Failed to store refreshed token"}))
+          ))?;
     }
+
+    // 8️⃣ Extend session TTL in Redis
+    store_user_session(&state.redis_client, &session_id, &session, 30 * 24 * 3600)
+      .await
+      .map_err(|_| (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(json!({"error": "Failed to store session"}))
+      ))?;
+
+    // 9️⃣ Return new access token info
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "message": "Session refreshed",
+            "access_token": token.access_token().secret(),
+            "expires_in": token.expires_in().map(|d| d.as_secs())
+        })),
+    ))
 }

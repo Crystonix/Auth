@@ -1,16 +1,16 @@
 localhost {
-    # Backend API: strip /api prefix before sending to auth-service
-    handle_path /api/* {
+    # Backend API: strip auth/ prefix before sending to auth-service
+    handle_path /auth/* {
         reverse_proxy auth-service:4000
     }
 
     # PGAdmin: preserve /pgadmin prefix
-    handle /pgadmin/* {
+    handle_path /pgadmin/* {
         reverse_proxy pgadmin:80
     }
 
     # RedisInsight: preserve /redisinsight prefix
-    handle /redisinsight/* {
+    handle_path /redisinsight/* {
         reverse_proxy redisinsight:5540
     }
 

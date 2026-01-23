@@ -21,7 +21,7 @@ services:
       - app-net
 
   auth-db:
-    image: postgres:16
+    image: postgres:latest
     environment:
       POSTGRES_DB: ${AUTH_DB}
       POSTGRES_USER: ${AUTH_DB_USER}
@@ -29,7 +29,7 @@ services:
     ports:
       - "${AUTH_DB_PORT}:${AUTH_DB_PORT}"
     volumes:
-      - data-auth:/var/lib/postgresql/data
+      - data-auth:/var/lib/postgresql
     networks:
       - app-net
 
@@ -46,7 +46,7 @@ services:
       - app-net
 
   redis:
-    image: redis:7-alpine
+    image: redis:latest
     ports:
       - "${REDIS_PORT}:${REDIS_PORT}"
     networks:
@@ -92,6 +92,7 @@ services:
       - "${AUTH_SERVICE_PORT}:4000"
     networks:
       - app-net
+
 
 volumes:
   caddy_data:
