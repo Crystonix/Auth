@@ -1,24 +1,15 @@
 services:
-  caddy:
-    image: caddy:latest
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - app-net
-
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    environment:
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
     ports:
-      - "5173:5173"
+      - "3000:3000"
     networks:
       - app-net
+
 
   auth-db:
     image: postgres:latest
@@ -26,6 +17,8 @@ services:
       POSTGRES_DB: ${AUTH_DB}
       POSTGRES_USER: ${AUTH_DB_USER}
       POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     ports:
       - "${AUTH_DB_PORT}:${AUTH_DB_PORT}"
     volumes:
@@ -90,6 +83,20 @@ services:
       - redis
     ports:
       - "${AUTH_SERVICE_PORT}:4000"
+    networks:
+      - app-net
+  
+  caddy:
+    image: caddy:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/conf/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       - app-net
 
