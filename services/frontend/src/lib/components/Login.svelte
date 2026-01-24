@@ -1,6 +1,8 @@
 <script lang="ts">
   // $lib/components/Login.svelte
 	import { user } from "$lib/stores/user.svelte";
+  const AUTH_URL = import.meta.env.VITE_PUBLIC_AUTH_SERVICE_URL;
+
   let loading = $state(false);
   let showDropdown = $state(false);
 
@@ -10,11 +12,11 @@
 
   function login() {
     loading = true;
-    window.location.href = '/auth/discord/login';
+    window.location.href = `${AUTH_URL}/discord/login`;
   }
 
   function logout() {
-    window.location.href = '/auth/logout';
+    window.location.href = `${AUTH_URL}/logout`;
   }
 </script>
 

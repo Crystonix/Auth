@@ -113,7 +113,7 @@ pub async fn callback(
       .build();
     let jar = jar.add(cookie);
 
-    let redirect_url = "/dashboard";
+    let redirect_url = &state.config.frontend_url;
 
     (jar, Redirect::to(redirect_url)).into_response()
 }

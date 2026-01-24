@@ -2,9 +2,7 @@
 import type { LayoutServerLoad } from './$types';
 import type { AuthUser } from '$lib/auth/user';
 
-const AUTH_URL =
-  process.env.AUTH_SERVICE_URL ||
-  'http://localhost:4000';
+const AUTH_URL = import.meta.env.VITE_AUTH_SERVICE_URL;
 
 export const load: LayoutServerLoad = async ({ fetch, cookies }) => {
   const cookieHeader = cookies
@@ -12,8 +10,9 @@ export const load: LayoutServerLoad = async ({ fetch, cookies }) => {
     .map(c => `${c.name}=${c.value}`)
     .join('; ');
 
-  const res = await fetch('${AUTH_URL}/me', {
-    headers: { cookie: cookieHeader }
+  const res = await fetch(`${AUTH_URL}/me`, {
+    headers: { cookie: cookieHeader },
+    credentials: "include",
   });
 
   console.log("Res: ", res, "Cookie Header: ", cookieHeader);
