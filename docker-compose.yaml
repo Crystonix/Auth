@@ -59,10 +59,12 @@ services:
       FRONTEND_URL: ${FRONTEND_URL}
       REDIS_URL: ${REDIS_URL}
       AUTH_DB: ${AUTH_DB}
+      AUTH_DB_PORT: ${AUTH_DB_PORT}
       AUTH_DB_USER: ${AUTH_DB_USER}
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
       AUTH_DB_URL: ${AUTH_DB_URL}
       AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT}
+      ENVIRONMENT: ${ENVIRONMENT}
     depends_on:
       - auth-db
       - redis
@@ -77,11 +79,12 @@ services:
       dockerfile: Dockerfile
     environment:
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - PUBLIC_AUTH_SERVICE_URL=${PUBLIC_AUTH_SERVICE_URL}
     ports:
       - "3000:3000"
     networks:
       - app-net
-  
+
   caddy:
     image: caddy:latest
     restart: unless-stopped
