@@ -1,0 +1,48 @@
+@startuml
+title Auth service — Discord OAuth2 & session flow
+
+actor User
+participant "Browser" as Browser
+participant "Frontend (SvelteKit)" as Frontend
+participant "Auth Service (Axum)" as Auth
+participant Discord
+database "Postgres (users)" as Postgres
+storage "Redis (sessions)" as Redis
+
+User -> Browser: clicks "Login"
+Browser -> Frontend: view / (click)
+Frontend -> Auth: GET /discord/login
+Auth -> Discord: 302 Redirect to OAuth2 authorize (client_id, redirect_uri, state)
+Browser -> Discord: User authorizes (OAuth2 UI)
+Discord -> Browser: Redirect to /discord/callback?code=...&state=...
+Browser -> Auth: GET /discord/callback (code)
+Auth -> Discord: POST /token (exchange code for token)
+Discord --> Auth: access_token, refresh_token
+Auth -> Auth: encrypt tokens (TOKEN_ENCRYPTION_KEY -> 32-bytes HEX -> AES-GCM)
+Auth -> Discord: GET /users/@me (with access_token)
+Discord --> Auth: user_info (id, username, avatar...)
+Auth -> Postgres: INSERT/UPDATE users (upsert by discord_id)
+Auth -> Redis: CREATE session (session_id -> user_id, encrypted tokens, ttl)
+Auth --> Browser: Set-Cookie session_id; Redirect to FRONTEND_URL
+Browser -> Frontend: request with cookie
+Frontend -> Auth: GET /me (cookie)
+Auth -> Redis: GET session:{session_id}
+alt session found
+  Auth -> Postgres: SELECT user by id
+  Auth --> Frontend: 200 OK { user profile }
+else session missing/expired
+  Auth --> Frontend: 401 Unauthorized
+end
+
+Frontend -> Auth: GET /refresh (optional)
+Auth -> Redis: validate session, refresh TTL or rotate session/token
+Auth --> Frontend: 200 OK (new session info)
+
+Frontend -> Auth: GET /logout
+Auth -> Redis: DEL session:{session_id}
+Auth --> Frontend: 204 No Content; Clear cookie
+
+note over Auth: AppState holds `Config`, `PgPool`, `redis::Client`, `oauth2::reqwest::Client`
+note over Auth: CORS origin = FRONTEND_URL (set in src/main.rs)
+
+@enduml

@@ -25,7 +25,7 @@
   <div class="relative inline-block text-left">
     <button
       onclick={toggleDropdown}
-      class="flex items-center px-4 py-2 rounded-md font-semibold transition transform hover:scale-[1.02] active:scale-100 bg-primary text-default hover:bg-primary-hover"
+      class="flex items-center px-4 py-2 rounded-md font-semibold transition transform hover:scale-[1.02] active:scale-100 bg-primary text-default hover:bg-primary-hover userAccentColor"
     >
       {#if user.avatar}
         <img src="{user.avatar}" alt="Avatar" class="w-6 h-6 rounded-full mr-2" />
@@ -53,7 +53,7 @@
   <!-- Login button when not logged in -->
   <button
     onclick={login}
-    class="px-4 py-2 rounded-md font-semibold transition transform hover:scale-[1.02] active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed bg-primary text-default hover:bg-primary-hover"
+    class="hover:login-btn-hover login-btn px-4 py-2 rounded-md font-semibold transition transform hover:scale-[1.02] active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed text-default"
     disabled={loading}
   >
     {#if loading}
@@ -63,3 +63,22 @@
     {/if}
   </button>
 {/if}
+
+<style>
+  .login-btn {
+    background-color: var(--color-primary);
+    color: var(--color-text-dark);
+  }
+
+  .login-btn:hover {
+    background-color: var(--color-primary-hover);
+  }
+
+ :global(.dark) .login-btn {
+    background-color:var(--color-primary);
+    color: var(--color-text-dark);
+  }
+  :global(.dark) .login-btn:hover {
+      background-color: var(--color-primary-hover);
+    }
+  </style>

@@ -17,6 +17,8 @@ html, body {
   color: var(--color-text-dark);
 }
 
+
+
 /* Typography (prose) */
 .prose {
   @apply transition-colors duration-500;
@@ -72,4 +74,22 @@ input, textarea, select, button {
 /* Buttons hover/active effect */
 button {
   @apply transition transform hover:scale-[1.02] active:scale-100;
+}
+
+.userAccentColor {
+  color: var(--user-accentColor);
+}
+
+.userContrastColor, .dark p, .dark li {
+  color: var(--user-contrastColor);
+} 
+
+.userAccentText {
+color: var(--user-accentColor);
+}
+
+
+.userAccentBg {
+background: var(--user-accentColor);
+color: var(--user-accentContrast);
 }

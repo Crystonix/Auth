@@ -14,14 +14,14 @@
   /* =========================
      CORE BACKGROUNDS
      ========================= */
-  --color-background-light: hsl(45, 100%, 96%);
-  --color-background-dark: hsl(260, 25%, 15%);
+  --color-background-light: hsl(270, 30%, 97%);
+  --color-background-dark: hsl(270, 25%, 10%);
 
-  --color-navbar-light: hsl(45, 90%, 88%);
-  --color-navbar-dark: hsl(260, 30%, 20%);
+  --color-navbar-light: hsl(270, 40%, 95%);
+  --color-navbar-dark: hsl(270, 30%, 15%);
 
-  --color-card-light: hsl(50, 100%, 85%);
-  --color-card-dark: hsl(260, 30%, 25%);
+  --color-card-light: hsl(270, 35%, 92%);
+  --color-card-dark: hsl(270, 28%, 18%);
 
   /* =========================
      GENERIC SURFACES (SEMANTIC)
@@ -35,42 +35,42 @@
   --color-surface-elevated-light: var(--color-navbar-light);
   --color-surface-elevated-dark: var(--color-navbar-dark);
 
-  --color-surface-overlay-light: hsl(50, 100%, 90%);
-  --color-surface-overlay-dark: hsl(260, 35%, 30%);
+  --color-surface-overlay-light: hsl(270, 35%, 88%);
+  --color-surface-overlay-dark: hsl(270, 30%, 22%);
 
   /* =========================
      TEXT ROLES
      ========================= */
-  --color-text-light: hsl(220, 25%, 20%);
-  --color-text-dark: hsl(0, 0%, 100%);
+  --color-text-light: hsl(270, 25%, 20%);
+  --color-text-dark: hsl(270, 15%, 95%);
 
-  --color-text-muted-light: hsl(220, 15%, 45%);
-  --color-text-muted-dark: hsl(0, 0%, 70%);
+  --color-text-muted-light: hsl(270, 15%, 45%);
+  --color-text-muted-dark: hsl(270, 10%, 65%);
 
   --color-text-inverted-light: hsl(0, 0%, 100%);
-  --color-text-inverted-dark: hsl(220, 25%, 20%);
+  --color-text-inverted-dark: hsl(270, 25%, 95%);
 
   /* =========================
      BRAND & INTERACTION
      ========================= */
-  --color-primary: hsl(200, 90%, 55%);
-  --color-primary-hover: hsl(200, 100%, 65%);
-  --color-primary-active: hsl(200, 100%, 45%);
+  --color-primary: hsl(270, 85%, 55%);
+  --color-primary-hover: hsl(270, 85%, 65%);
+  --color-primary-active: hsl(270, 85%, 45%);
 
-  --color-secondary: hsl(340, 85%, 60%);
-  --color-secondary-hover: hsl(340, 90%, 65%);
+  --color-secondary: hsl(200, 85%, 55%);
+  --color-secondary-hover: hsl(200, 85%, 65%);
 
-  --color-accent: hsl(50, 100%, 65%);
-  --color-accent-hover: hsl(50, 100%, 70%);
+  --color-accent: hsl(50, 95%, 60%);
+  --color-accent-hover: hsl(50, 95%, 70%);
 
   /* =========================
      BORDERS & DIVIDERS
      ========================= */
-  --color-border-light: hsl(45, 80%, 75%);
-  --color-border-dark: hsl(260, 30%, 40%);
+  --color-border-light: hsl(270, 30%, 80%);
+  --color-border-dark: hsl(270, 28%, 35%);
 
-  --color-divider-light: hsl(45, 80%, 80%);
-  --color-divider-dark: hsl(260, 25%, 35%);
+  --color-divider-light: hsl(270, 30%, 85%);
+  --color-divider-dark: hsl(270, 25%, 32%);
 
   /* =========================
      STATUS / FEEDBACK
@@ -108,4 +108,5 @@
 
   --easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
 }

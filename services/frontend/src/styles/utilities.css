@@ -60,6 +60,7 @@
     color: var(--color-primary);
   }
 
+
   .bg-primary {
     background-color: var(--color-primary);
   }
@@ -105,5 +106,13 @@
     --tw-ring-color: var(--color-focus-ring);
     --tw-ring-offset-width: var(--focus-ring-offset);
     --tw-ring-width: var(--focus-ring-width);
+  }
+
+  .bg-navbar-light {
+    background-color: var(--color-navbar-light);
+  }
+
+  .bg-navbar-dark {
+    background-color: var(--color-navbar-dark);
   }
 }
