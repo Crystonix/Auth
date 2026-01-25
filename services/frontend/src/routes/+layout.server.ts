@@ -5,6 +5,12 @@ import type { AuthUser } from '$lib/auth/user';
 const AUTH_URL = import.meta.env.VITE_AUTH_SERVICE_URL;
 
 export const load: LayoutServerLoad = async ({ fetch, cookies }) => {
+  if (import.meta.env.DEV) {
+    return {
+      user: null
+    };
+  }
+
   const cookieHeader = cookies
     .getAll()
     .map(c => `${c.name}=${c.value}`)
