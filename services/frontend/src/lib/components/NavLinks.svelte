@@ -4,6 +4,7 @@
 </script>
 
 <div class="flex space-x-4 items-center">
+  <a href="/diagram" class="hover:text-primary transition-colors duration-300">Diagram</a>
   {#if user.authenticated}
     <!-- Links for all logged-in users -->
 		 {#if user.role != null}
