@@ -4,7 +4,9 @@
 </script>
 
 <div class="flex space-x-4 items-center">
-  <a href="/diagram" class="hover:text-primary transition-colors duration-300">Diagram</a>
+  <a href="#ezchart" class="hover:text-primary transition-colors duration-300">Simple Chart</a>
+  <a href="#diagram" class="hover:text-primary transition-colors duration-300">Diagram</a>
+  <a href="#oauth" class="hover:text-primary transition-colors duration-300">OAuth2 Flow</a>
   {#if user.authenticated}
     <!-- Links for all logged-in users -->
 		 {#if user.role != null}

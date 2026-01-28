@@ -37,6 +37,8 @@
 
   nav {
     background-color: var(--color-navbar-light);
+    position: sticky;
+    top: 0;
   }
 
   :global(.dark) nav {
