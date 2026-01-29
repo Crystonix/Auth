@@ -1,22 +1,33 @@
 <script lang="ts">
 	import { Roles } from "$lib/auth/user";
   import { user } from "$lib/stores";
+	import Navlink from "./Navlink.svelte";
+
+  type NavLink = {
+		href: string;
+		label: string;
+	};
+
+  const links: NavLink[] = [
+		{ href: "/#ezchart", label: "Simple Chart" },
+		{ href: "/#diagram", label: "Diagram" },
+		{ href: "/#oauth", label: "OAuth2 Flow" }
+	];
 </script>
 
 <div class="flex space-x-4 items-center">
-  <a href="#ezchart" class="hover:text-primary transition-colors duration-300">Simple Chart</a>
-  <a href="#diagram" class="hover:text-primary transition-colors duration-300">Diagram</a>
-  <a href="#oauth" class="hover:text-primary transition-colors duration-300">OAuth2 Flow</a>
-  {#if user.authenticated}
-    <!-- Links for all logged-in users -->
-		 {#if user.role != null}
-				<a href="/dashboard" class="hover:text-primary transition-colors duration-300">Dashboard</a>
-		 {/if}
+	{#each links as link}
+		<Navlink href={link.href} label={link.label} />
+	{/each}
 
-    {#if user.role === Roles.ADMIN}
-      <!-- Admin-only links -->
-      <a href="/admin" class="hover:text-primary transition-colors duration-300">Admin</a>
-      <a href="/admin/settings" class="hover:text-primary transition-colors duration-300">Settings</a>
-    {/if}
-  {/if}
+	{#if user.authenticated}
+		{#if user.role != null}
+			<Navlink href="/dashboard" label="Dashboard" />
+		{/if}
+
+		{#if user.role === Roles.ADMIN}
+			<Navlink href="/admin" label="Admin" />
+			<Navlink href="/admin/settings" label="Settings" />
+		{/if}
+	{/if}
 </div>

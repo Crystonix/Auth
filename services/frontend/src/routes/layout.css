@@ -4,6 +4,11 @@
 @import '../styles/theme.css';
 @import '../styles/utilities.css';
 
+html {
+	scroll-behavior: smooth;
+}
+
+
 /* Global styling with smooth transition using theme variables */
 html, body {
   @apply font-sans antialiased min-h-screen transition-colors duration-500;
@@ -82,7 +87,7 @@ button {
 
 .userContrastColor, .dark p, .dark li {
   color: var(--user-contrastColor);
-} 
+}
 
 .userAccentText {
 color: var(--user-accentColor);
