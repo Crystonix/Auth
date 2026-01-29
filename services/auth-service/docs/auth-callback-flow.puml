@@ -1,38 +1,43 @@
 @startuml
 !theme plain
+title Discord OAuth2 Callback Flow (Current)
+
 actor Client
+participant "Browser" as B
 participant "Auth Service\n(Rust / Axum)" as Auth
 participant "Redis\n(Ephemeral)" as Redis
 participant "Postgres\n(Persistent)" as Postgres
-participant "OAuth Provider\n(Discord / Google)" as Provider
+participant "OAuth Provider\n(Discord)" as Provider
 
-== Login Flow ==
-Client -> Auth : GET /login?provider=discord
-Auth -> Provider : Redirect user for OAuth2 login
-Provider -> Client : OAuth callback URL with code & state
-Client -> Auth : GET /callback?code=xxx&state=yyy
-Auth -> Redis : Store OAuthSession {csrf_token, pkce_verifier, nonce}
-Auth -> Postgres : Upsert User & UserProvider
-Auth -> Postgres : Upsert OAuthToken (store refresh_token)
-Auth -> Redis : Create UserSession {session_id, user_id, role, session_version, expires_at, ip, ua}
-Auth -> Client : Set session cookie
+== OAuth Callback ==
+Client -> B : Redirect from Discord with ?code & state
+B -> Auth : GET /callback?code=xxx&state=yyy
 
-== Access Protected Resource ==
-Client -> Auth : GET /api/resource (with session cookie)
-Auth -> Redis : Validate UserSession {session_id, session_version, last_activity}
-Auth -> Redis : Update last_activity
-Auth -> Postgres : Optionally fetch user / roles if needed
-Auth -> Client : Return resource
+== Step 1: Validate OAuth session ==
+Auth -> Redis : Get OAuthSession {csrf_token, pkce_verifier, nonce} by session_id cookie
+Auth -> Auth : Verify CSRF token matches state parameter
 
-== Token Rotation ==
-Auth -> Postgres : Fetch OAuthToken for user_provider_id
-Auth -> Provider : Refresh access token using refresh_token
-Auth -> Postgres : Update OAuthToken {encrypted_refresh_token, previous_refresh_token, last_token_rotation}
-Auth -> Redis : Optional: update UserSession if session_version changes
+== Step 2: Exchange code for token ==
+Auth -> Provider : POST /token with code + PKCE verifier
+Provider -> Auth : Return access_token (and optional refresh_token)
 
-== Logout / Revoke ==
-Client -> Auth : POST /logout
-Auth -> Redis : Delete UserSession
-Auth -> Postgres : Delete / revoke OAuthToken
-Client <- Auth : 200 OK
+== Step 3: Fetch user info ==
+Auth -> Provider : GET /users/@me with access_token
+Provider -> Auth : Return Discord user info
+
+== Step 4: Upsert user and provider ==
+Auth -> Postgres : Upsert User
+Auth -> Postgres : Upsert UserProvider
+Auth -> Postgres : Encrypt & store OAuthToken (refresh_token)
+
+== Step 5: Create ephemeral session ==
+Auth -> Redis : Store UserSession {session_id, user_id, role, session_version, expires_at=24h}
+
+== Step 6: Cleanup OAuth session ==
+Auth -> Redis : Delete OAuthSession
+
+== Step 7: Set cookie + redirect ==
+Auth -> B : Set "session_id" cookie (httpOnly, Secure, SameSite=Lax, max-age=24h)
+Auth -> Client : Redirect to frontend URL
+
 @enduml
