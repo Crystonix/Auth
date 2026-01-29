@@ -22,7 +22,7 @@
 
 	{#if user.authenticated}
 		{#if user.role != null}
-			<Navlink href="/dashboard" label="Dashboard" />
+			<Navlink href="/dashboard" label="Dashboard"/>
 		{/if}
 
 		{#if user.role === Roles.ADMIN}
