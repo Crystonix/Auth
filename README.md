@@ -1,6 +1,14 @@
 # auth
 
-Monorepo for the auth project. It contains a SvelteKit frontend and a Session based authentication service written in rust that implements Discord OAuth2, session storage in Redis, token encryption, and Postgres persistence.
+Monorepo for a auth project during my study Programm. 
+It contains a SvelteKit frontend and a Session based authentication service written in rust.
+THe infrastructure is deployed in containers by docker. 
+
+It implements Discord OAuth2, session storage in Redis, token encryption, and Postgres persistence.
+
+You can find a more detailed report in german here: [DiscordAuthenticator Bericht](./DiscordAuthenticator_Bericht.pdf)
+
+## Setup
 
 First, apply all .env variables correctly.
 
