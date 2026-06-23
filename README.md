@@ -12,19 +12,19 @@ You can find a more detailed report in german here: [DiscordAuthenticator Berich
 
 First, apply all .env variables correctly.
 
-The Auth Service needs the DB to be setup to compile since we need compile time checks.
+The Auth Service needs the DB to be setup to compile since we want compile time checks with SQLX.
 Do this with:
 `docker compose up -d auth_db`
 
-Next, install SQLX:
+Install SQLX:
 `cargo install sqlx-cli`
 
 Setup and migrate the Database Tables.
-To do this, first go into `/services/auth-service/` and run
+in `/services/auth-service/` run
 `sqlx migrate run` , then
 `cargo sqlx prepare`.
 
-Now we can start we rest of the containers:
+Start the rest of the containers:
 `docker compose up -d`
 
-Frontend should now be rachable vial `localhost`.
+Frontend should now be reachable via `localhost`.
