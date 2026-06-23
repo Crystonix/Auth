@@ -2,7 +2,9 @@
 
 Monorepo for a auth project during my study Programm. 
 It contains a SvelteKit frontend and a Session based authentication service written in rust.
-The infrastructure is deployed in containers by docker. 
+The infrastructure is deployed in containers by docker.
+
+The goal was understanding the Identity Provider implementation that is normally covered by IdP/IAM Platforms such as Keycloak or Authentik.
 
 It implements Discord OAuth2, session storage in Redis, token encryption, and Postgres persistence.
 
